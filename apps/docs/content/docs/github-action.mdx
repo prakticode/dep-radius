@@ -1,0 +1,143 @@
+---
+title: GitHub Action
+description: One comment on every pull request that changes a dependency, kept up to date on every push.
+icon: GitPullRequest
+---
+
+Renovate or Dependabot opens the pull request, radius tells you if you need to read it. The Action
+runs `radius --since <base of the pull request>`, posts the brief as a comment, and edits that same
+comment on every push. Pull requests that change no dependency get no comment at all.
+
+<Callout title="Needs dep-radius 0.2.0 or later">
+  The Action is built on `--since`, which arrives in 0.2.0. The `v0` tag always runs a version that
+  has it.
+</Callout>
+
+## Set it up
+
+```yaml title=".github/workflows/dep-radius.yml"
+name: dep-radius
+
+on:
+  pull_request:
+    paths:
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/pnpm-lock.yaml"
+      - "**/yarn.lock"
+      - "**/bun.lock"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prakticode/dep-radius@v0
+```
+
+That's all. No install step: radius reads the lockfile, it doesn't need `node_modules`. The
+`paths` filter is optional, it just saves runs on pull requests that can't change a dependency.
+
+## What you get
+
+- **A comment** on the pull request: a table of the changed dependencies with their verdicts, then
+  a short section for each one that needs a look, with the files and lines.
+- **The job summary**, with the same brief, even when commenting isn't allowed.
+- **A failing check** when an export your code uses was removed (you can change that, see
+  `fail-on`).
+- **Outputs** to build on, like auto-merging quiet updates.
+
+## Inputs
+
+| Input               | Default                    | What                                                                  |
+| ------------------- | -------------------------- | --------------------------------------------------------------------- |
+| `github-token`      | `${{ github.token }}`      | Comments on the pull request, and lifts GitHub's limit for release notes |
+| `base`              | the pull request's base commit | The commit to compare with                                         |
+| `working-directory` | `.`                        | The folder radius reads, for a project inside a bigger repository     |
+| `comment`           | `true`                     | `false` writes the brief to the job summary only                       |
+| `fail-on`           | `blocked`                  | Fail the step on `blocked`, on `review` as well, or `never`           |
+| `version`           | the one released with the Action | The dep-radius version to run                                   |
+| `args`              | none                       | Extra options, like `--prod` or `--no-notes`                          |
+
+## Outputs
+
+| Output      | What                                                                  |
+| ----------- | --------------------------------------------------------------------- |
+| `verdict`   | `quiet`, `review`, `blocked`, or `none` when no direct dependency changed |
+| `exit-code` | The radius exit code: `0`, `1` or `2`                                 |
+| `json`      | Path to the brief as JSON ([the format](/docs/json))                  |
+| `markdown`  | Path to the brief as Markdown                                         |
+
+## Recipes
+
+### Be strict: fail on review too
+
+```yaml
+- uses: prakticode/dep-radius@v0
+  with:
+    fail-on: review
+```
+
+### Auto-merge quiet updates from Renovate
+
+```yaml title=".github/workflows/dep-radius.yml"
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: radius
+        uses: prakticode/dep-radius@v0
+      - if: steps.radius.outputs.verdict == 'quiet' && github.event.pull_request.user.login == 'renovate[bot]'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+```
+
+`--auto` merges only once your required checks pass, and it needs "Allow auto-merge" turned on in
+the repository settings.
+
+<Callout type="warn" title="Keep your tests as a required check">
+  Quiet means "nothing you use changed, according to the types and the release notes". Behaviour
+  changes that no note mentions are invisible to radius. Auto-merge on quiet **and** green tests,
+  never on quiet alone.
+</Callout>
+
+### A project in a subfolder
+
+```yaml
+- uses: prakticode/dep-radius@v0
+  with:
+    working-directory: packages/api
+```
+
+### Use the JSON in a later step
+
+```yaml
+- id: radius
+  uses: prakticode/dep-radius@v0
+  with:
+    comment: false
+- run: jq '.summary' "${{ steps.radius.outputs.json }}"
+```
+
+## Good to know
+
+- **Dependabot and forks.** GitHub gives pull requests from Dependabot and from forks a read-only
+  token, so the comment can't be posted. The Action says so in a warning, doesn't fail, and the
+  brief is still in the job summary.
+- **Pinning.** `@v0` follows every 0.x release. To pin exactly, use a full tag like `@v0.2.0`, or
+  set `version`.
+- **Node.js.** If the runner's Node is older than 22.18, the Action sets up Node 24 for its own
+  steps.
+- **Nothing runs from the pull request.** radius reads files. It never installs packages or runs
+  scripts from the branch it analyses.

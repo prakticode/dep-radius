@@ -1,0 +1,128 @@
+---
+title: The JSON brief
+description: "The --json output, field by field. A stable contract: version 1 only ever gains fields."
+icon: Braces
+---
+
+`radius --json` prints one JSON object on stdout. It's the same brief as the terminal report and the
+pull request comment, just shaped for programs.
+
+## The stability promise
+
+- The object carries `"schemaVersion": 1`.
+- Version 1 **only gains fields**. Removing or renaming one would mean `schemaVersion: 2`.
+- A JSON Schema ships with the engine: `@dep-radius/core/schema/brief-v1.schema.json`. You can
+  validate against it, or just read it.
+
+So: read the fields you need, ignore the ones you don't know, and your integration keeps working.
+
+## The top level
+
+| Field           | Type     | What                                                                     |
+| --------------- | -------- | ------------------------------------------------------------------------ |
+| `schemaVersion` | `1`      | The contract version                                                     |
+| `tool`          | object   | `name`, `version`, and the `typescript` version that read the types      |
+| `root`          | string   | The folder that was analysed                                             |
+| `generatedAt`   | string   | ISO 8601                                                                 |
+| `since`         | object?  | With `--since` only: the `ref` you gave and the `commit` it resolved to  |
+| `exitCode`      | `0`, `1`, `2` | The worst verdict: quiet, review, blocked                           |
+| `summary`       | object   | Counts: `manifests`, `withUpdate`, `upToDate`, `quiet`, `review`, `blocked`, `notAnalyzed` |
+| `packages`      | array    | One entry per analysed update, see below                                 |
+| `notAnalyzed`   | array    | `{ name, reason }` for dependencies radius skipped, and why              |
+| `wholeProject`  | array    | Things that hide usage for the whole project, like `require(someVariable)` |
+| `limits`        | string[] | The limits that applied to this run, in plain words                      |
+
+With `--since`, `summary.withUpdate` counts the dependencies that changed version and
+`summary.upToDate` counts the ones that didn't.
+
+## A package
+
+| Field           | What                                                                          |
+| --------------- | ----------------------------------------------------------------------------- |
+| `name`          | The package name                                                              |
+| `from`, `to`    | The installed version and the analysed target                                 |
+| `bump`          | `major`, `minor` or `patch` (a `0.x` minor counts as a major)                 |
+| `publishedAt`   | When `to` was published                                                       |
+| `verdict`       | `quiet`, `review` or `blocked`                                                |
+| `reasons`       | `{ code, detail }[]`: every rule that fired, see [codes](#reason-codes)       |
+| `versionSource` | Where `from` came from: `node_modules`, `lockfile:npm`, `lockfile:pnpm`, `lockfile:yarn`, `lockfile:bun`, or `manifest-range` (a guess) |
+| `manifests`     | The `package.json` files that declare it                                      |
+| `types`         | Net 1, the type surface, see below                                            |
+| `notes`         | Net 2, the release notes, see below                                           |
+| `usage`         | How your code uses it                                                         |
+| `heldBack`      | Newer versions skipped, with a `reason` (`too-new`, `deprecated`, `above-dist-tag`) |
+| `alsoAvailable` | A newer version beyond the safe line, not analysed (use `--latest` for it)    |
+
+### `types`
+
+| Field      | What                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| `status`   | `computed`, `no-types`, `types-from-@types`, `types-elsewhere`, `failed`, `disabled`, `offline-uncached` |
+| `changes`  | How many exports changed between the two versions                                         |
+| `added`    | How many exports are new                                                                  |
+| `touched`  | The changes that land on your code                                                        |
+
+Each entry of `touched`:
+
+| Field       | What                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------- |
+| `path`      | The export, like `schemakit:email`, `schemakit:coerce.number` or `schemakit:Schema#parse` (`.` for namespace members, `#` for members of a type) |
+| `change`    | `removed`, `changed` or `deprecated`                                                  |
+| `certainty` | `exact` when resolved precisely, `by-name` when matched by member name only          |
+| `before`, `after` | The normalised signatures, when the export still exists                        |
+| `sites`     | Where your code uses it                                                               |
+| `alsoAt`    | The same change seen from other entry points of the package                           |
+
+### `notes`
+
+| Field                 | What                                                                          |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `coverage`            | `complete`, `partial`, `none-published`, `unavailable` or `disabled`          |
+| `entries`             | How many note entries were read in total                                      |
+| `versions`            | Per version: `status`, the `source` (`kind` and `url`), or a `reason`         |
+| `matched`             | Entries that name something you use: `version`, `title`, `breaking`, `direct`, `refs`, and `names` (`name`, `certainty`, `where`) |
+| `breakingWithoutApi`  | Breaking entries that name no API, so they could apply to anyone              |
+
+### `usage`
+
+| Field          | What                                                                     |
+| -------------- | ------------------------------------------------------------------------ |
+| `files`        | How many files use the package                                           |
+| `sites`        | How many places                                                          |
+| `names`        | `exact` (resolved) and `byName` (matched by name) names your code uses   |
+| `sitesByName`  | Every site, keyed by the name used there                                 |
+| `cannotSee`    | `{ kind, count, examples }[]`, see [what radius cannot see](/docs/blind-spots) |
+
+### A site
+
+| Field      | What                                                        |
+| ---------- | ----------------------------------------------------------- |
+| `file`     | Relative to `root`                                          |
+| `line`, `column` | 1-based                                               |
+| `typeOnly` | `true` when used only as a type                             |
+| `code`     | The source line, trimmed                                    |
+| `via`      | Local files that re-export the package on the way, if any   |
+
+## Reason codes
+
+| Code                      | Pushes to | Means                                                            |
+| ------------------------- | --------- | ---------------------------------------------------------------- |
+| `removed-touched`         | blocked   | An export you use was removed                                    |
+| `changed-touched`         | review    | A signature you use changed                                      |
+| `deprecated-touched`      | review    | Something you use is newly deprecated                            |
+| `possibly-touched`        | review    | A member you may reach by name changed                           |
+| `notes-match`             | review    | A release note names something you use                           |
+| `unattributed-breaking`   | review    | A breaking note names no API, so it could be about you           |
+| `blind-spots`             | review    | Part of your usage isn't visible                                 |
+| `opaque-usage`            | review    | Used from scripts, config, CSS or side effects                   |
+| `not-referenced`          | review    | No scanned file uses it: a tool, loaded by name, or unused       |
+| `flagged-install`         | review    | Patched, not on the registry, or the version was guessed         |
+| `surface-incomplete`      | review    | The types couldn't be fully compared                             |
+| `no-evidence`             | review    | Neither the notes nor the types are complete                     |
+| `major-unproven`          | review    | A major is only quiet when both nets are complete and clean      |
+| `notes-complete-no-match` | (quiet)   | Every note read, none mentions what you use                      |
+| `surface-clean`           | (quiet)   | No changed or removed export you use                             |
+| `caveat-no-types`         | (quiet)   | Quiet, judged without types                                      |
+| `caveat-no-notes`         | (quiet)   | Quiet, judged without release notes                              |
+
+The last four only appear on quiet packages, to say what the verdict stood on.

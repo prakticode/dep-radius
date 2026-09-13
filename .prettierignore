@@ -4,3 +4,7 @@ coverage/
 .turbo/
 /notes/
 pnpm-lock.yaml
+.next/
+.source/
+next-env.d.ts
+*.mdx

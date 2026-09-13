@@ -1,0 +1,88 @@
+---
+title: FAQ
+description: The questions people ask before trusting a tool with their upgrades.
+icon: MessagesSquare
+---
+
+<Accordions type="single">
+<Accordion title="Does radius run my code, or install anything?">
+
+No. It reads your files and parses them. Package tarballs are downloaded and read in memory: only
+their `package.json`, type declarations and changelog. No install, no lifecycle scripts, nothing
+from the packages ever runs.
+
+</Accordion>
+<Accordion title="Does my code leave my machine?">
+
+No. radius talks to your npm registry, to `api.github.com` and to `raw.githubusercontent.com`, only
+to fetch package metadata and release notes. See
+[what leaves your machine](/docs/how-it-works#what-leaves-your-machine).
+
+</Accordion>
+<Accordion title="Is it an AI tool?">
+
+No, and that's on purpose. It's deterministic: the same inputs give the same verdicts, and every
+verdict comes with the rule that produced it. It's built to be **used by** AI agents, which is a
+different thing. See [For AI agents](/docs/agents).
+
+</Accordion>
+<Accordion title="Does it replace Renovate or Dependabot?">
+
+No, it completes them. They notice updates and open pull requests. radius tells you which of those
+pull requests you need to read. The [GitHub Action](/docs/github-action) puts the answer right on
+the pull request.
+
+</Accordion>
+<Accordion title="If it says quiet, can I skip my tests?">
+
+Please don't. Quiet means nothing you use changed according to the types and the release notes. A
+behaviour change nobody wrote down is invisible to any tool that reads notes. Quiet plus green
+tests is the combination to trust.
+
+</Accordion>
+<Accordion title="Which projects does it support?">
+
+JavaScript and TypeScript projects with npm, pnpm, Yarn (classic, berry, Plug'n'Play) or Bun. One
+`package.json` or a monorepo with many. Plain JavaScript works too: without types, radius relies on
+the release notes, and says so.
+
+</Accordion>
+<Accordion title="My monorepo has 30 packages. Do I run it 30 times?">
+
+No. Run it at the root: every `package.json` is read, and each installed version of a dependency is
+briefed once, with the manifests that declare it. To focus on one package, pass its folder: `radius ./packages/api`.
+
+</Accordion>
+<Accordion title="Private registries?">
+
+Yes. radius reads the registry, scoped registries and `_authToken` entries from your `.npmrc`, just
+like npm. Release notes still come from GitHub, when the package points to a GitHub repository.
+
+</Accordion>
+<Accordion title="Why is a package I don't touch marked review?">
+
+Usually because radius can't see how it's used: it's run from a script (`eslint`), named in a
+config file (a Babel plugin), or it's a framework used through file conventions (`next`). Those are
+listed under "cannot see how you use these". See [what radius cannot see](/docs/blind-spots).
+
+</Accordion>
+<Accordion title="Why is the version it proposes not the latest one?">
+
+By default radius stays on your version's line (same major), skips versions younger than a day, and
+never goes above the `latest` tag. Newer majors show up as "also available". Use `--latest`, or
+`package@version`, to analyse something else.
+
+</Accordion>
+<Accordion title="radius said quiet and it was wrong. What now?">
+
+That's the bug that matters most, so thank you in advance: please
+[open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose) with the
+package, the two versions and what broke.
+
+</Accordion>
+<Accordion title="How much does it cost?">
+
+Nothing. The CLI, the engine and the GitHub Action are open source under the MIT license.
+
+</Accordion>
+</Accordions>

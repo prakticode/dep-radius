@@ -1,3 +1,11 @@
 packages:
+  - apps/*
   - packages/*
   - tooling/*
+
+# Install scripts run only for the packages named here (pnpm 11 refuses the rest).
+allowBuilds:
+  # its install script checks the platform binary of the docs bundler
+  esbuild: true
+  # the resolver behind eslint-config-next ships prebuilt binaries, its script only rebuilds them
+  unrs-resolver: false

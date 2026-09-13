@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "index",
+    "quickstart",
+    "---For AI agents---",
+    "agents",
+    "json",
+    "---On pull requests---",
+    "github-action",
+    "---How it works---",
+    "verdicts",
+    "how-it-works",
+    "blind-spots",
+    "---Reference---",
+    "cli",
+    "library",
+    "faq"
+  ]
+}
