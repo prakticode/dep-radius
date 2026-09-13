@@ -32,6 +32,62 @@ const jsonImportSelector = {
     'A JSON import carries with { type: "json" }: Node ESM refuses it without.',
 }
 
+// How comments are written and imports ordered, in every package and app. An app with its own
+// framework config (the docs, on Next.js) spreads these after it.
+export const conventions = [
+  {
+    rules: {
+      "no-warning-comments": [
+        "error",
+        {
+          terms: [
+            "this ",
+            "we ",
+            "helper",
+            "returns ",
+            "gets ",
+            "sets ",
+            "adds ",
+            "handles ",
+            "todo",
+            "fixme",
+          ],
+          location: "start",
+          decoration: ["*"],
+        },
+      ],
+    },
+  },
+  {
+    plugins: { perfectionist },
+    rules: {
+      // Sorted by ESLint and not by Prettier because no Prettier sorter offers
+      // a length comparator; the fallback keeps two lines of equal length in a
+      // deterministic order.
+      "perfectionist/sort-imports": [
+        "error",
+        {
+          type: "line-length",
+          order: "asc",
+          fallbackSort: { type: "natural" },
+          newlinesBetween: 1,
+          groups: [
+            "builtin",
+            "external",
+            "workspace",
+            "internal",
+            ["parent", "sibling", "index"],
+          ],
+          customGroups: [
+            { groupName: "workspace", elementNamePattern: "^@dep-radius/" },
+          ],
+        },
+      ],
+      "perfectionist/sort-named-imports": ["error", { type: "natural" }],
+    },
+  },
+]
+
 /**
  * @param {{ tsconfigRootDir: string, envAllowedIn: string[] }} options
  *   tsconfigRootDir: the package folder, for type-checked rules
@@ -75,6 +131,11 @@ export function config({ tsconfigRootDir, envAllowedIn }) {
       files: ["**/*.{js,mjs,cjs}"],
       languageOptions: { globals: globals.node },
     },
+    ...conventions,
+    // before the test files block: a later block replaces a rule, so the test titles would be lost
+    {
+      rules: { "no-restricted-syntax": ["error", jsonImportSelector] },
+    },
     {
       files: ["**/*.test.ts"],
       rules: {
@@ -84,58 +145,6 @@ export function config({ tsconfigRootDir, envAllowedIn }) {
           ...testTitleSelectors,
           jsonImportSelector,
         ],
-      },
-    },
-    {
-      rules: {
-        "no-restricted-syntax": ["error", jsonImportSelector],
-        "no-warning-comments": [
-          "error",
-          {
-            terms: [
-              "this ",
-              "we ",
-              "helper",
-              "returns ",
-              "gets ",
-              "sets ",
-              "adds ",
-              "handles ",
-              "todo",
-              "fixme",
-            ],
-            location: "start",
-            decoration: ["*"],
-          },
-        ],
-      },
-    },
-    {
-      plugins: { perfectionist },
-      rules: {
-        // Sorted by ESLint and not by Prettier because no Prettier sorter offers
-        // a length comparator; the fallback keeps two lines of equal length in a
-        // deterministic order.
-        "perfectionist/sort-imports": [
-          "error",
-          {
-            type: "line-length",
-            order: "asc",
-            fallbackSort: { type: "natural" },
-            newlinesBetween: 1,
-            groups: [
-              "builtin",
-              "external",
-              "workspace",
-              "internal",
-              ["parent", "sibling", "index"],
-            ],
-            customGroups: [
-              { groupName: "workspace", elementNamePattern: "^@dep-radius/" },
-            ],
-          },
-        ],
-        "perfectionist/sort-named-imports": ["error", { type: "natural" }],
       },
     },
     {

@@ -46,7 +46,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      # the published packages only; the docs site is built by the check job
+      - run: pnpm turbo run build --filter=./packages/*
       # the tarballs npm would receive: a missing file or an unresolved workspace: range fails here,
       # not in a user's terminal
       - name: pack

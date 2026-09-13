@@ -39,6 +39,7 @@ edited on every push. Inputs and outputs are in [`action.yml`](action.yml).
 | [`packages/cli`](packages/cli)                           | `dep-radius`       | The `radius` command                                                 |
 | [`packages/core`](packages/core)                         | `@dep-radius/core` | The engine, usable as a library                                      |
 | [`packages/action`](packages/action)                     | private            | The GitHub Action's report step, run from [`action.yml`](action.yml) |
+| [`apps/docs`](apps/docs)                                 | private            | The documentation site, Fumadocs on Next.js                          |
 | [`tooling/eslint-config`](tooling/eslint-config)         | private            | Shared ESLint rules                                                  |
 | [`tooling/typescript-config`](tooling/typescript-config) | private            | Shared TypeScript settings                                           |
 
@@ -50,7 +51,8 @@ Requires Node 22.12 or later and pnpm.
 
 ```sh
 pnpm install
-pnpm build          # every package, core first
+pnpm build          # every package, core first, and the docs site
+pnpm --filter @dep-radius/docs dev   # the docs on http://localhost:3000
 pnpm check          # format, lint, typecheck and tests, cached by Turborepo
 pnpm changeset      # describe a change for the next release
 ```

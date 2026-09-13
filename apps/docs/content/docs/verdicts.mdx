@@ -1,0 +1,74 @@
+---
+title: Quiet, review, blocked
+description: What each verdict means, what earns it, and why quiet is the hardest one to get.
+icon: Scale
+---
+
+Every analysed update gets exactly one verdict. Rules are checked in order, and **every rule that
+fires is kept** in `reasons`, so you always know why.
+
+## Blocked
+
+**An export your code uses was removed.** The types were compared, and something your code imports,
+calls or references (even only as a type) no longer exists in the new version.
+
+This is the only rule that blocks. It's a strong signal: the code most likely won't compile.
+
+## Review
+
+Any one of these is enough:
+
+**Changes land on your usage**
+
+- A signature you use changed, or became deprecated.
+- A member you might reach by name changed (radius couldn't resolve it precisely, so it says
+  "possibly").
+
+**The release notes mention you**
+
+- A note names something you use.
+- A breaking note names no API at all, so it could be about anyone, including you.
+
+**radius can't fully see how you use the package**
+
+- It's used from a script, a config file, CSS, or only for side effects.
+- It's passed around whole, read with computed keys, or reached through files that didn't parse.
+- No scanned file uses it at all.
+- The installed copy is patched, isn't on the registry, or its version had to be guessed.
+
+**The evidence is missing**
+
+- The types couldn't be compared and the notes aren't complete either.
+- It's a major (or a `0.x` minor), and the two nets aren't both complete and clean.
+
+## Quiet
+
+Everything else. Concretely, for an update to be quiet:
+
+- every name your code uses was found in the old types,
+- nothing radius can't see is in the way,
+- and at least one net is complete with zero hits: all the release notes were read and none
+  mentions you, or the types were compared and nothing you use changed.
+
+<Callout title="The asterisk">
+  A quiet verdict that stood on **one net only** (no types, or notes missing for some versions) is
+  marked with `*` in the terminal and "(one net)" in pull request comments. Still quiet, just
+  worth knowing.
+</Callout>
+
+## Why quiet is hard to earn
+
+The only bug that really hurts is a wrong quiet: you merge without reading, and something breaks
+in production. So radius treats every blind spot as a reason to look, not as a reason to relax.
+
+Before its first release, radius was backtested on 462 real dependency upgrades from four
+repositories: every update it would have called quiet was checked against what the project actually
+had to change. Zero wrong quiets. Found one? Please
+[open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose), it's the
+most useful report there is.
+
+## Several packages
+
+The run's exit code is the worst verdict: `2` if anything is blocked, else `1` if anything needs
+review, else `0`. A package radius can't analyse (a registry error, a version that doesn't exist, a
+dependency installed from git) is listed under "not analysed" with the reason, and the others go on.

@@ -1,0 +1,95 @@
+---
+title: Quickstart
+description: From zero to your first brief in under a minute.
+icon: Rocket
+---
+
+You need **Node.js 22.12 or later** and a JavaScript or TypeScript project. That's it.
+
+<Steps>
+<Step>
+
+### Run it in your project
+
+```sh
+cd your-project
+npx dep-radius
+```
+
+radius finds every direct dependency with an update waiting, and briefs each one. The first run
+downloads package metadata and release notes. Later runs come mostly from the cache and are fast.
+
+</Step>
+<Step>
+
+### Read the verdicts
+
+Quiet updates are listed on one line: you can merge them without reading. Each **review** or
+**blocked** package gets a short block with the lines of your code that are concerned, and the
+release notes that mention what you use.
+
+</Step>
+<Step>
+
+### Look at one package, or one exact version
+
+```sh
+npx dep-radius zod            # only this package
+npx dep-radius zod@4.6.0      # this exact target
+npx dep-radius --latest       # the newest version, even across majors
+```
+
+</Step>
+<Step>
+
+### Already upgraded? Ask what changed
+
+Ran `npm update` or merged a bot's lockfile change? Compare with a commit instead of the registry:
+
+```sh
+npx dep-radius --since HEAD   # changes not committed yet
+npx dep-radius --since main   # everything this branch changed
+```
+
+`--since` needs nothing installed: it reads the versions from the lockfile at that commit.
+
+</Step>
+</Steps>
+
+## Install it for good (optional)
+
+`npx` is fine for most people. If you run it a lot:
+
+```npm
+npm install --save-dev dep-radius
+```
+
+Then use `radius` (or `dep-radius`, same thing) in your scripts.
+
+## Give it a GitHub token (recommended)
+
+Release notes mostly come from GitHub, which allows 60 requests an hour without a token. radius
+picks up `GITHUB_TOKEN`, `GH_TOKEN`, or your `gh` login automatically, which lifts that to 5000.
+
+```sh
+gh auth login   # once, and radius finds it
+```
+
+## Use the exit code
+
+| Code | Verdict                                  |
+| ---- | ---------------------------------------- |
+| `0`  | quiet: everything is quiet               |
+| `1`  | review: at least one package needs a look |
+| `2`  | blocked: an export you use was removed   |
+| `3`  | radius itself failed (bad option, no git history for `--since`) |
+
+The code is the worst verdict across packages, so `npx dep-radius zod && npm run deploy` does
+what you'd hope.
+
+## Next
+
+<Cards>
+  <Card title="For AI agents" href="/docs/agents" />
+  <Card title="GitHub Action" href="/docs/github-action" />
+</Cards>

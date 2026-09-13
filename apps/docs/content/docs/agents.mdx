@@ -1,0 +1,146 @@
+---
+title: Use radius from an AI agent
+description: Two relevant lines instead of forty changelogs. The loop, the commands, and a snippet to paste into AGENTS.md.
+icon: Bot
+---
+
+An agent that upgrades a dependency usually does one of two things: it skips the changelog and
+hopes, or it reads every release note and burns thousands of tokens on emoji fixes and CI tweaks.
+radius is the middle path. It reads the notes and the types **against your code**, and hands the
+agent only what lands on it, as JSON, with a file and a line for each finding.
+
+## The loop
+
+<Steps>
+<Step>
+
+### Change the versions
+
+The agent runs the upgrade however the project does it: `pnpm up zod`, `npm install react@19`, or a
+manual edit plus an install.
+
+</Step>
+<Step>
+
+### Ask radius what changed
+
+```sh
+npx dep-radius --since HEAD --json
+```
+
+`--since HEAD` compares the working tree with the last commit, so uncommitted upgrades are exactly
+what gets analysed. On a branch with several commits, use `--since main`.
+
+</Step>
+<Step>
+
+### Act on the exit code
+
+| Exit | The agent should                                                                  |
+| ---- | --------------------------------------------------------------------------------- |
+| `0`  | Carry on and run the tests as usual. Nothing it uses changed.                     |
+| `1`  | Open each site in `types.touched[].sites` and `notes.matched`, adapt, run radius again. |
+| `2`  | Fix every site of a `removed` change before finishing. The code will not compile as is. |
+| `3`  | Stop and report the error. Don't guess a verdict.                                 |
+
+</Step>
+<Step>
+
+### Run the tests
+
+radius replaces reading changelogs, not running tests. A quiet brief plus green tests is the
+combination you can trust.
+
+</Step>
+</Steps>
+
+## Paste this into AGENTS.md
+
+Works the same in `CLAUDE.md`, `.cursor/rules`, `.github/copilot-instructions.md`, or wherever your
+agent reads project instructions.
+
+```md title="AGENTS.md"
+## Dependency updates
+
+After changing any dependency version (package.json or the lockfile), run:
+
+    npx dep-radius --since HEAD --json
+
+Then act on the exit code:
+
+- 0 (quiet): nothing this project uses changed. Run the tests as usual.
+- 1 (review): for each package with "verdict": "review", read `reasons`, then open every
+  `types.touched[].sites[]` and every site named in `notes.matched[]` (look them up in
+  `usage.sitesByName`). Adapt the code where the change applies, then run radius again.
+- 2 (blocked): an export the code uses was removed. Fix every site listed under
+  `types.touched[]` with "change": "removed" before finishing.
+- 3: radius failed. Report the error instead of guessing.
+
+Entries in `usage.cannotSee` are places radius could not follow (scripts, config files, names passed
+around). Check those by hand or with the tests. Never call an update safe from radius alone.
+```
+
+## Reading the JSON quickly
+
+The full shape is on [The JSON brief](/docs/json). Here it is trimmed to the fields an agent needs
+90% of the time:
+
+```json
+{
+  "schemaVersion": 1,
+  "exitCode": 2,
+  "packages": [
+    {
+      "name": "schemakit",
+      "from": "3.1.4",
+      "to": "4.0.0",
+      "verdict": "blocked",
+      "reasons": [{ "code": "removed-touched", "detail": "1 removed export you use: schemakit:legacy" }],
+      "types": {
+        "touched": [
+          {
+            "path": "schemakit:legacy",
+            "change": "removed",
+            "sites": [{ "file": "src/signup.ts", "line": 12, "column": 1, "typeOnly": false, "code": "legacy()" }]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+A few `jq` one-liners that come in handy:
+
+```sh
+# every file:line to look at
+npx dep-radius --since HEAD --json | jq -r '.packages[].types.touched[].sites[] | "\(.file):\(.line)"'
+
+# the release notes that mention what you use
+npx dep-radius --since HEAD --json | jq -r '.packages[].notes.matched[] | "\(.version)  \(.title)"'
+
+# only the packages that need attention
+npx dep-radius --json | jq '.packages[] | select(.verdict != "quiet") | {name, from, to, verdict}'
+```
+
+## Tips for smooth agent runs
+
+- **Give it a token.** Set `GITHUB_TOKEN` (or be logged in with `gh`). Without one, GitHub allows
+  60 requests an hour and some release notes may be skipped, which radius will say in the brief.
+- **No progress output to parse.** With `--json`, stdout is the JSON and nothing else. Progress
+  only ever shows up for a human in a terminal.
+- **Second runs are cheap.** Everything downloaded is cached, so the "adapt, run again" loop costs
+  about as long as reading your files. `--offline` makes that explicit.
+- **Stay in one folder.** Point radius at the project root, or at one package of a monorepo:
+  `npx dep-radius ./packages/api --since HEAD --json`.
+
+## Docs, for agents
+
+This site is readable by agents too:
+
+| URL                         | What                                                   |
+| --------------------------- | ------------------------------------------------------ |
+| `/llms.txt`                 | An index of every page                                 |
+| `/llms-full.txt`            | Every page in one Markdown file                        |
+| Any page URL + `.md`        | That page as Markdown, like `/docs/agents.md`          |
+| `Accept: text/markdown`     | Any docs URL answers in Markdown when asked to         |

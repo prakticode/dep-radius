@@ -1,0 +1,58 @@
+---
+title: What radius cannot see
+description: Every blind spot, in plain words, and what to do about it. Honesty beats a green checkmark.
+icon: EyeOff
+---
+
+Reading names in code gets you far, but not everywhere. When radius can't see how a package is used,
+it says so, and the update goes to **review** instead of quiet. In the brief, these show up under
+"cannot see how you use these", and in JSON under `usage.cannotSee`.
+
+## Used in ways names can't show
+
+| Kind                   | In plain words                                  | Typical example                          |
+| ---------------------- | ----------------------------------------------- | ---------------------------------------- |
+| `script-bin`           | run from `scripts` in package.json              | `"lint": "eslint ."`                     |
+| `config-reference`     | named in a config file                          | a plugin listed in `.babelrc`            |
+| `side-effect-import`   | imported only for side effects                  | `import "reflect-metadata"`              |
+| `css-import`           | imported from CSS                               | `@import "tailwindcss"`                  |
+| `convention-framework` | a framework used through file conventions       | `next`, with its `app/` folder           |
+| `ambient-types`        | types that apply globally                       | `@types/node`                            |
+
+For these, radius can't know which part of the package you rely on. Your build and your tests can.
+
+## Usage radius couldn't follow
+
+| Kind                         | In plain words                                         |
+| ---------------------------- | ------------------------------------------------------ |
+| `namespace-escape`           | the whole module is passed around (`doSomething(z)`)   |
+| `computed-member`            | read with computed keys (`lib[name]()`)                |
+| `dynamic-import-escape`      | loaded with `import()` and passed on                   |
+| `prefix-dynamic-import`      | loaded by a computed subpath (`` import(`lodash/${fn}`) ``) |
+| `public-reexport`            | re-exported to your own consumers, who may use anything |
+| `unresolved-local-import`    | reached through a local import that didn't resolve    |
+| `derived-escape`             | a value built from it travels through too many files   |
+| `unparseable-file`           | used in a file that didn't parse                       |
+| `unresolved-against-surface` | a name you use isn't in its types at all               |
+
+## For the whole project
+
+Some things hide usage everywhere at once, so they're reported once, at the top of the brief (and in
+JSON under `wholeProject`), without downgrading every package:
+
+- `require(someVariable)` and `import(someVariable)` with a non-literal name,
+- generated files that were skipped,
+- files that didn't parse.
+
+## The limits, stated plainly
+
+- **Behaviour changes are only seen through release notes.** If a function keeps its signature but
+  does something different, and no note says so, radius can't know.
+- **No type checker runs over your code.** A member reached through a callback or a value from
+  somewhere radius didn't follow is matched by name only ("possibly").
+- **A local name that shadows an import** isn't analysed.
+- **Types that re-export another package's types** are judged from the notes only.
+- **Release notes come from GitHub** and the package's own changelog. Other forges aren't read yet.
+- **Transitive dependencies are out of scope.** Your lockfile and an install cooldown own that risk.
+
+Each brief lists the limits that applied to that run, so nothing here is a surprise later.

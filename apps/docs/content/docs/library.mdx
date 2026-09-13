@@ -1,0 +1,77 @@
+---
+title: Use the engine from code
+description: "@dep-radius/core: the engine behind the CLI and the Action, for your own tools."
+icon: Package
+---
+
+The CLI and the GitHub Action are thin shells around one library, `@dep-radius/core`. If you're
+building your own integration (a bot, a dashboard, an MCP server), you can call it directly.
+
+```npm
+npm install @dep-radius/core
+```
+
+<Callout type="warn" title="0.x: the JSON is the stable part">
+  The JavaScript API may still move between minor versions while radius is in 0.x. The
+  [JSON brief](/docs/json) is the contract that doesn't. If you only need the result, running
+  `npx dep-radius --json` and parsing it is the most future-proof option.
+</Callout>
+
+## Run an analysis
+
+```ts title="brief.ts"
+import {
+  createCtx,
+  defaultCacheDir,
+  type Options,
+  renderMarkdown,
+  run,
+  toJsonV1,
+} from "@dep-radius/core"
+
+const options = {
+  root: process.cwd(),
+  specs: [], // package names, or name@version
+  since: "main", // leave out to compare with the registry
+  format: "json",
+  offline: false,
+  minAgeMs: undefined, // the project's setting, or one day
+  latest: false,
+  notes: true,
+  surface: true,
+  prod: false,
+  concurrency: 8,
+  cacheDir: defaultCacheDir(process.env),
+  verbose: false,
+  now: Date.now(),
+  color: false,
+} satisfies Options
+
+const brief = await run(options, createCtx(options), (event) => {
+  if (event.type === "package") console.error(`${event.done}/${event.total} ${event.name}`)
+})
+
+console.log(toJsonV1(brief).summary) // the stable JSON shape
+console.log(renderMarkdown(brief, options.now)) // the pull request comment
+```
+
+## What's exported
+
+| Export                                | What                                                                |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| `run(options, ctx, onEvent?)`         | Analyse a project, resolves to a `Brief`                            |
+| `createCtx(options, http?)`           | The cache, network limits and GitHub token lookup `run` needs       |
+| `defaultCacheDir(env)`                | The platform cache folder                                           |
+| `toJsonV1(brief)`, `renderJson(brief)` | The JSON brief, as an object or a string                           |
+| `renderMarkdown(brief, now)`          | The pull request comment                                            |
+| `parseSpec("zod@4.6.0")`              | `{ name, version }`                                                 |
+| `parseDuration("7d")`                 | Milliseconds                                                        |
+| `toolVersion()`                       | The engine's version                                                |
+| `@dep-radius/core/render`             | The grouping and label helpers the terminal report is built from   |
+| `@dep-radius/core/schema/brief-v1.schema.json` | The JSON Schema of the brief                               |
+
+All the model types (`Brief`, `PackageBrief`, `Options`, `RunEvent` and friends) are exported too.
+
+`onEvent` receives `files` (reading your code), `packages` (how many will be analysed),
+`package-start` and `package` events, handy for a progress bar. Nothing in the result depends on
+it.

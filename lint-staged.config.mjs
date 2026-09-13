@@ -27,6 +27,6 @@ function lintPerPackage(files) {
 // Prettier formats first, then ESLint sorts imports: the import order is measured on formatted lines.
 // Typecheck and tests run through Turborepo, from .husky/pre-commit.
 export default {
-  "*.{ts,js,mjs,cjs}": ["prettier --write", lintPerPackage],
-  "*.{json,md,yaml,yml}": "prettier --write",
+  "*.{ts,tsx,js,mjs,cjs}": ["prettier --write", lintPerPackage],
+  "*.{json,md,yaml,yml,css}": "prettier --write",
 }

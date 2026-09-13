@@ -1,0 +1,130 @@
+---
+title: How it works
+description: From your folder to a verdict, in six steps. No magic, no AI, just your code, the types and the release notes.
+icon: Cog
+---
+
+radius is deterministic: the same project, the same versions and the same release notes always give
+the same verdicts. There is no AI inside, no account, and no server of ours in the loop.
+
+<Steps>
+<Step>
+
+### Find your dependencies
+
+radius reads every `package.json` it finds (tracked by git, or on disk outside git, skipping build
+folders like `dist` and `.next`). For each declared dependency, the installed version comes from, in
+order:
+
+1. `node_modules`, resolved exactly like Node does, symlinks included (pnpm, workspaces).
+2. The lockfile: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` (classic and berry, Plug'n'Play
+   included) or `bun.lock`.
+3. The lowest version the range allows, as a last resort. That guess is flagged, and never quiet.
+
+Workspace packages (`workspace:`, `link:`, `file:`) are yours, so they're skipped. Dependencies
+installed from git or a URL are listed as not analysed.
+
+</Step>
+<Step>
+
+### Pick the version to compare with
+
+By default, the newest version **on the same line** as yours: same major (or same minor for
+`0.x`), because that's what a caret range promises is safe. It skips prereleases, deprecated
+versions, anything above the `latest` tag, and versions younger than the cooldown:
+
+- `--min-age`, if you pass it,
+- else your project's own setting (`minimumReleaseAge` in `pnpm-workspace.yaml`, or
+  `minimum-release-age` in `.npmrc`),
+- else one day.
+
+A newer major is shown as "also available" without being analysed. `--latest` or `package@version`
+picks the target yourself, and `--since` takes it from your working tree.
+
+</Step>
+<Step>
+
+### Read your code
+
+radius parses `.js`, `.ts`, `.jsx`, `.tsx`, `.mjs`, `.cjs`, and the scripts of `.vue`, `.svelte` and
+`.astro` files. It records every `import`, `require` and `import()`, then follows what you do with
+them: `z.string().email()` becomes the names `string` and `email`.
+
+It also follows your own indirections:
+
+- local files that re-export a package (`export * from "zod"` in `src/lib/zod.ts`),
+- `paths` from `tsconfig.json` or `jsconfig.json`,
+- workspace packages that re-export it,
+- values built from the package in one file and used in another.
+
+Comments and strings never count as usage, only real identifiers do.
+
+</Step>
+<Step>
+
+### Net 1: compare the types
+
+radius downloads both versions (checking their integrity), reads only the `.d.ts` files, in memory,
+and compares every export with its own copy of the TypeScript compiler. Your `node_modules` and
+your TypeScript version play no part, so the result is the same on every machine.
+
+Each export ends up unchanged, added, widened (a new overload, an extra optional parameter),
+changed, deprecated, or removed. Only the changes that match names your code uses count.
+
+</Step>
+<Step>
+
+### Net 2: read the release notes
+
+For **every** version between yours and the target, radius looks for notes, first hit wins:
+
+1. a changelog shipped inside the package,
+2. the GitHub release for that version,
+3. the `CHANGELOG.md` in the repository.
+
+Notes are split into entries. Housekeeping (ci, chore, docs, test, dependency bumps) is counted but
+never matched. An entry matches when it names something you use: `email()` in a note matches your
+`z.email()`, but the word "email" in a sentence doesn't. And when a name shows up in the code
+examples of a quarter of all entries, only its mentions outside examples count, so every
+`z.object()` example doesn't match everything.
+
+</Step>
+<Step>
+
+### Decide
+
+Both nets are kept apart, never merged into one reassuring score, and the rules on
+[Quiet, review, blocked](/docs/verdicts) turn them into a verdict.
+
+</Step>
+</Steps>
+
+## The cache
+
+Everything downloaded is cached on disk: package metadata (revalidated with its ETag), tarballs,
+compared type surfaces, and GitHub release lists (for an hour). A second run is mostly offline and takes about as long as
+reading your files.
+
+Type surfaces are keyed by the tarball's integrity hash, so they don't depend on your project at
+all.
+
+| Platform | Default location                              |
+| -------- | --------------------------------------------- |
+| Linux    | `$XDG_CACHE_HOME/dep-radius`, or `~/.cache/dep-radius` |
+| macOS    | `~/Library/Caches/dep-radius`                 |
+| Windows  | `%LOCALAPPDATA%\dep-radius\Cache`             |
+
+`RADIUS_CACHE_DIR` or `--cache-dir` puts it elsewhere. Deleting the folder is always safe.
+
+## What leaves your machine
+
+Your code never does. radius only makes these requests:
+
+| To                                   | For                                         |
+| ------------------------------------ | ------------------------------------------- |
+| your npm registry (npmjs.org by default) | package metadata and tarballs           |
+| `api.github.com`                     | release notes, with your token if you have one |
+| `raw.githubusercontent.com`          | `CHANGELOG.md` files                        |
+
+The registry and its auth token come from your `.npmrc`, scoped registries included. The GitHub
+token is only ever sent to `api.github.com`.

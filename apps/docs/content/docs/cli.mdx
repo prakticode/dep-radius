@@ -1,0 +1,71 @@
+---
+title: CLI reference
+description: Every command, option, exit code and environment variable.
+icon: Terminal
+---
+
+The package is `dep-radius`, the command is `radius` (`dep-radius` works too).
+
+## Usage
+
+```sh
+radius [path]                       # every direct dependency with an update waiting
+radius <package>[@<version|tag>]... # only these packages; a version analyses that exact target
+radius --since <git-ref>            # the dependencies whose version changed since that commit
+```
+
+- `path` is written like a path (`.`, `./api`, `../web`, `/abs/path`, `packages/api`). A bare word
+  like `zod` is always a package, so a folder named like a package is reached as `./zod`.
+- Packages and a path can be combined: `radius ./packages/api zod react`.
+- `--since` takes package names too, to narrow it down, but not versions.
+
+## Options
+
+| Option                  | What                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| `--json`                | Print the brief as JSON ([format](/docs/json)). Nothing else goes to stdout.             |
+| `--markdown`            | Print the brief as a pull request comment.                                               |
+| `--since <git-ref>`     | Compare with a commit instead of the registry: `HEAD`, `main`, `origin/main`, a hash. Reads the lockfile at that commit, needs nothing installed. |
+| `--latest`              | Target the newest version, even across majors. Can't be combined with `--since`.         |
+| `--min-age <duration>`  | Hold back versions younger than this. Default `1d`, or your project's `minimumReleaseAge`. `0` turns it off. Accepts `90m`, `36h`, `7d`, `2w`; a bare number is minutes. |
+| `--offline`             | Read the cache only, never the network.                                                   |
+| `--no-notes`            | Don't read release notes.                                                                 |
+| `--no-surface`          | Don't compare type surfaces.                                                              |
+| `--prod`                | Skip `devDependencies`.                                                                   |
+| `--concurrency <n>`     | Network requests at once. Default `8` (GitHub gets at most 4).                           |
+| `--cache-dir <dir>`     | Where the cache lives. See [the cache](/docs/how-it-works#the-cache).                    |
+| `--verbose`, `-v`       | Every note, every site, every quiet package with its reasons.                            |
+| `--version`             | Print the version.                                                                        |
+| `--help`, `-h`          | Print the help.                                                                           |
+
+`--json` and `--markdown` can't be used together.
+
+## Exit codes
+
+| Code | Means                                                             |
+| ---- | ----------------------------------------------------------------- |
+| `0`  | quiet: nothing you use changed                                    |
+| `1`  | review: at least one package needs a look                         |
+| `2`  | blocked: an export you use was removed                            |
+| `3`  | radius itself failed: a bad option, a path that doesn't exist, a ref that isn't there |
+
+## Environment variables
+
+| Variable                        | What                                                         |
+| ------------------------------- | ------------------------------------------------------------ |
+| `GITHUB_TOKEN` or `GH_TOKEN`    | Read release notes with 5000 requests an hour instead of 60. Without either, radius asks `gh auth token`. |
+| `RADIUS_CACHE_DIR`              | The cache folder, when `--cache-dir` isn't given.            |
+| `XDG_CACHE_HOME`                | When set, the default cache folder goes inside it.           |
+| `NO_COLOR`                      | No colours in the terminal report.                           |
+| `CI`                            | No progress display.                                         |
+| `npm_config_registry`           | The default registry, like npm itself.                       |
+
+Registries, scoped registries and their `_authToken` are read from `~/.npmrc` and the project's
+`.npmrc`, with `${ENV_VAR}` placeholders expanded.
+
+## Output
+
+- **Terminal** (default): progress on stderr while it works (only in an interactive terminal),
+  then the brief on stdout. Colours when stdout is a terminal.
+- **`--json`**: one JSON object on stdout.
+- **`--markdown`**: one Markdown document on stdout, ready for a comment.
