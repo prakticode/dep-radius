@@ -4,6 +4,7 @@ import { ServerCodeBlock } from "fumadocs-ui/components/codeblock.rsc"
 
 import { githubUrl } from "@/lib/shared"
 import { Terminal } from "@/components/home/terminal"
+import { DemoVideo } from "@/components/home/demo-video"
 
 const agentsSnippet = `## Dependency updates
 
@@ -98,6 +99,25 @@ export default function HomePage() {
             does.
           </Verdict>
         </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-5xl px-6 py-16">
+        <h2 className="mb-2 text-2xl font-semibold tracking-tight">
+          A real run, on vercel/commerce
+        </h2>
+        <p className="mb-8 max-w-2xl text-fd-muted-foreground">
+          Four of its dependencies, unedited: a changed signature with the five
+          lines that use it, a release note tied to the one line it concerns, a
+          quiet update, and a package radius says it cannot see into.
+        </p>
+        <DemoVideo />
+        <p className="mt-4 text-sm text-fd-muted-foreground">
+          <code>
+            npx dep-radius @types/react sonner @headlessui/react geist
+          </code>{" "}
+          at commit <code>1df2cf6</code>. Without package names, radius checks
+          every dependency with an update.
+        </p>
       </section>
 
       <Feature
