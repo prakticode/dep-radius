@@ -12,6 +12,8 @@ export interface Options {
   offline: boolean
   minAgeMs: number | undefined
   latest: boolean
+  // a git ref: analyse the dependencies whose version changed between it and the working tree
+  since?: string
   notes: boolean
   surface: boolean
   prod: boolean

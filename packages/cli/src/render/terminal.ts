@@ -7,6 +7,7 @@ import {
   groupBriefs,
   oneNetOnly,
   opaqueLabel,
+  sinceLabel,
   siteLabel,
   sitesFor,
   surfaceLabel,
@@ -32,7 +33,9 @@ export function renderTerminal(brief: Brief, opts: TerminalOptions): string {
   out.push(
     c(
       "dim",
-      `${brief.manifests} ${brief.manifests === 1 ? "manifest" : "manifests"} · ${brief.packages.length} with an update · ${brief.upToDate} up to date · versions from ${sources}`
+      brief.since
+        ? `${brief.manifests} ${brief.manifests === 1 ? "manifest" : "manifests"} · since ${sinceLabel(brief.since)} · ${brief.packages.length} changed · ${brief.upToDate} unchanged`
+        : `${brief.manifests} ${brief.manifests === 1 ? "manifest" : "manifests"} · ${brief.packages.length} with an update · ${brief.upToDate} up to date · versions from ${sources}`
     )
   )
   out.push("")
@@ -106,7 +109,7 @@ export function renderTerminal(brief: Brief, opts: TerminalOptions): string {
     brief.packages.filter((p) => p.verdict === v).length
   out.push("")
   out.push(
-    `${c("bold", `${brief.packages.length} with an update`)}  ${c("green", `${count("quiet")} quiet`)} · ${c("yellow", `${count("review")} review`)} · ${c("red", `${count("blocked")} blocked`)}  ${c("dim", `· ${brief.upToDate} up to date`)}`
+    `${c("bold", `${brief.packages.length} ${brief.since ? "changed" : "with an update"}`)}  ${c("green", `${count("quiet")} quiet`)} · ${c("yellow", `${count("review")} review`)} · ${c("red", `${count("blocked")} blocked`)}  ${c("dim", `· ${brief.upToDate} ${brief.since ? "unchanged" : "up to date"}`)}`
   )
   return `${out.join("\n")}\n`
 }

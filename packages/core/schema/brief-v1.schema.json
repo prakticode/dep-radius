@@ -33,6 +33,19 @@
     },
     "root": { "type": "string" },
     "generatedAt": { "type": "string", "description": "ISO 8601" },
+    "since": {
+      "type": "object",
+      "description": "Present with --since: packages are the dependencies whose version changed between this commit and the working tree, and summary.upToDate counts the unchanged ones",
+      "additionalProperties": false,
+      "required": ["ref", "commit"],
+      "properties": {
+        "ref": { "type": "string", "description": "The ref as given" },
+        "commit": {
+          "type": "string",
+          "description": "The full commit hash it resolved to"
+        }
+      }
+    },
     "exitCode": {
       "enum": [0, 1, 2],
       "description": "0 quiet, 1 review, 2 blocked: the worst verdict"

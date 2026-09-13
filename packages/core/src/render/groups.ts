@@ -123,3 +123,9 @@ export function surfaceLabel(p: PackageBrief): string {
       return `unknown (${s.detail ?? "extraction failed"})`
   }
 }
+
+// "main (8f74b3b)", or only the short hash when the ref already is a hash, as in a pull request
+export function sinceLabel(since: NonNullable<Brief["since"]>): string {
+  const short = since.commit.slice(0, 7)
+  return since.commit.startsWith(since.ref) ? short : `${since.ref} (${short})`
+}
