@@ -1,6 +1,6 @@
 {
   "name": "@dep-radius/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The engine behind radius: which changes in a dependency update land on code you actually wrote.",
   "license": "MIT",
   "author": "prakticode",
