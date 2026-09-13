@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dep-radius brief, schema version 1",
+  "description": "The output of `radius --json`. Fields are only ever added in version 1; removing or renaming one means schemaVersion 2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "tool",
+    "root",
+    "generatedAt",
+    "exitCode",
+    "summary",
+    "packages",
+    "notAnalyzed",
+    "wholeProject",
+    "limits"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "typescript"],
+      "properties": {
+        "name": { "const": "dep-radius" },
+        "version": { "type": "string" },
+        "typescript": {
+          "type": "string",
+          "description": "The TypeScript version that read the declaration files"
+        }
+      }
+    },
+    "root": { "type": "string" },
+    "generatedAt": { "type": "string", "description": "ISO 8601" },
+    "exitCode": {
+      "enum": [0, 1, 2],
+      "description": "0 quiet, 1 review, 2 blocked: the worst verdict"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifests",
+        "withUpdate",
+        "upToDate",
+        "quiet",
+        "review",
+        "blocked",
+        "notAnalyzed"
+      ],
+      "properties": {
+        "manifests": { "type": "integer" },
+        "withUpdate": { "type": "integer" },
+        "upToDate": { "type": "integer" },
+        "quiet": { "type": "integer" },
+        "review": { "type": "integer" },
+        "blocked": { "type": "integer" },
+        "notAnalyzed": { "type": "integer" }
+      }
+    },
+    "packages": { "type": "array", "items": { "$ref": "#/$defs/package" } },
+    "notAnalyzed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "reason"],
+        "properties": {
+          "name": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "wholeProject": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/cannotSee" }
+    },
+    "limits": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "line", "column", "typeOnly", "code"],
+      "properties": {
+        "file": { "type": "string", "description": "Relative to root" },
+        "line": { "type": "integer" },
+        "column": { "type": "integer" },
+        "typeOnly": { "type": "boolean" },
+        "code": { "type": "string", "description": "The source line, trimmed" },
+        "via": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Local files that re-export the package, nearest last"
+        }
+      }
+    },
+    "cannotSee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "count", "examples"],
+      "properties": {
+        "kind": { "type": "string" },
+        "count": { "type": "integer" },
+        "examples": { "type": "array", "items": { "$ref": "#/$defs/site" } }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "from",
+        "to",
+        "bump",
+        "publishedAt",
+        "verdict",
+        "reasons",
+        "versionSource",
+        "manifests",
+        "types",
+        "notes",
+        "usage",
+        "heldBack"
+      ],
+      "properties": {
+        "name": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "bump": { "enum": ["major", "minor", "patch"] },
+        "publishedAt": { "type": "string" },
+        "verdict": { "enum": ["quiet", "review", "blocked"] },
+        "reasons": { "type": "array", "items": { "$ref": "#/$defs/reason" } },
+        "versionSource": { "type": "string" },
+        "manifests": { "type": "array", "items": { "type": "string" } },
+        "types": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "touched"],
+          "properties": {
+            "status": { "type": "string" },
+            "detail": { "type": "string" },
+            "changes": { "type": "integer" },
+            "added": { "type": "integer" },
+            "touched": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "alsoAt", "change", "certainty", "sites"],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "package[/subpath]:Name, with . for members of a namespace and # for members of a type"
+                  },
+                  "alsoAt": { "type": "array", "items": { "type": "string" } },
+                  "change": { "enum": ["removed", "changed", "deprecated"] },
+                  "certainty": { "enum": ["exact", "by-name"] },
+                  "before": { "type": "array", "items": { "type": "string" } },
+                  "after": { "type": "array", "items": { "type": "string" } },
+                  "sites": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/site" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "notes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "coverage",
+            "entries",
+            "versions",
+            "matched",
+            "breakingWithoutApi"
+          ],
+          "properties": {
+            "coverage": { "type": "string" },
+            "entries": { "type": "integer" },
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["version", "status"],
+                "properties": {
+                  "version": { "type": "string" },
+                  "status": { "type": "string" },
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["kind", "url"],
+                    "properties": {
+                      "kind": { "type": "string" },
+                      "url": { "type": "string" }
+                    }
+                  },
+                  "reason": { "type": "string" }
+                }
+              }
+            },
+            "matched": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version",
+                  "title",
+                  "breaking",
+                  "direct",
+                  "refs",
+                  "names"
+                ],
+                "properties": {
+                  "version": { "type": "string" },
+                  "title": { "type": "string" },
+                  "breaking": { "type": "boolean" },
+                  "direct": { "type": "boolean" },
+                  "refs": { "type": "array", "items": { "type": "string" } },
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["name", "certainty", "where"],
+                      "properties": {
+                        "name": { "type": "string" },
+                        "certainty": { "enum": ["exact", "by-name"] },
+                        "where": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "breakingWithoutApi": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["version", "title", "refs"],
+                "properties": {
+                  "version": { "type": "string" },
+                  "title": { "type": "string" },
+                  "refs": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["files", "sites", "names", "sitesByName", "cannotSee"],
+          "properties": {
+            "files": { "type": "integer" },
+            "sites": { "type": "integer" },
+            "names": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["exact", "byName"],
+              "properties": {
+                "exact": { "type": "array", "items": { "type": "string" } },
+                "byName": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "sitesByName": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/site" }
+              }
+            },
+            "cannotSee": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/cannotSee" }
+            }
+          }
+        },
+        "heldBack": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["version", "reason"],
+            "properties": {
+              "version": { "type": "string" },
+              "reason": { "type": "string" },
+              "publishedAt": { "type": "string" }
+            }
+          }
+        },
+        "alsoAvailable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "bump"],
+          "properties": {
+            "version": { "type": "string" },
+            "bump": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

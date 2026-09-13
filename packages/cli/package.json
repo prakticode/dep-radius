@@ -1,0 +1,64 @@
+{
+  "name": "dep-radius",
+  "version": "0.0.0",
+  "description": "Tells you which changes in a dependency update land on code you actually wrote.",
+  "license": "MIT",
+  "author": "prakticode",
+  "homepage": "https://github.com/prakticode/dep-radius#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prakticode/dep-radius.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/prakticode/dep-radius/issues"
+  },
+  "keywords": [
+    "dependencies",
+    "upgrade",
+    "semver",
+    "changelog",
+    "release-notes",
+    "renovate",
+    "dependabot",
+    "breaking-changes",
+    "typescript",
+    "cli"
+  ],
+  "type": "module",
+  "bin": {
+    "radius": "dist/cli.js",
+    "dep-radius": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0",
+    "lint:fix": "eslint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.0",
+    "@dep-radius/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.0"
+  }
+}

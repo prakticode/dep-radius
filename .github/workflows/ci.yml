@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # the oldest supported line, from "engines", and the one the repo pins in .nvmrc
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Prettier, ESLint, TypeScript and tests, through Turborepo
+      - run: pnpm check
+      - run: pnpm build
+
+  packed:
+    name: packed packages install and run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # the tarballs npm would receive: a missing file or an unresolved workspace: range fails here,
+      # not in a user's terminal
+      - name: pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/packs"
+          for dir in packages/core packages/cli; do
+            (cd "$dir" && pnpm pack --pack-destination "$RUNNER_TEMP/packs")
+          done
+      - name: install the tarballs in an empty project
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir consumer && cd consumer
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund ../packs/*.tgz
+          npx radius --version
+          npx radius --help > /dev/null
+      # radius on its own repository: exit 1 (review) and 2 (blocked) are verdicts, 3 is a failure
+      - name: run on this repository
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          "$RUNNER_TEMP/consumer/node_modules/.bin/radius" --markdown >> "$GITHUB_STEP_SUMMARY"
+          code=$?
+          echo "radius exited with $code"
+          test "$code" -le 2

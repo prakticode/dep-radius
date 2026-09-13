@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# one release at a time, and never cancelled halfway through a publish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  release:
+    name: version or publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # the version commit, the git tags and the GitHub releases
+      contents: write
+      # the "version packages" pull request
+      pull-requests: write
+      # npm trusted publishing: npm trusts this workflow through OIDC, no npm token is stored
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          # trusted publishing needs Node 22.14 or later; .nvmrc pins 24
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      # With pending changesets: opens or updates the "version packages" pull request.
+      # Once that pull request is merged: builds and publishes both packages, tags, and creates
+      # the GitHub releases. Provenance is attached automatically by trusted publishing.
+      - uses: changesets/action@v2
+        with:
+          version-script: pnpm version-packages
+          publish-script: pnpm release
+          commit-message: "chore(release): version packages"
+          pr-title: "chore(release): version packages"
