@@ -1,5 +1,11 @@
 # @dep-radius/core
 
+## 0.2.1
+
+### Patch Changes
+
+- 4c5aa07: The npm pages link to the documentation at [depradius.com](https://depradius.com).
+
 ## 0.2.0
 
 ### Minor Changes
