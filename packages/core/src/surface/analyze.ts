@@ -7,7 +7,7 @@ import { getTarballFiles } from "../registry/tarball.ts"
 import type { Packument } from "../registry/packument.ts"
 import type { RegistryConfig } from "../registry/npmrc.ts"
 import { diffSurfaces, surfaceChangeCount } from "./delta.ts"
-import { lastName, parsePath, resolveRef } from "../symbol-path.ts"
+import { entryPrefix, lastName, parsePath, resolveRef } from "../symbol-path.ts"
 import type {
   BlindSpotKind,
   Candidate,
@@ -18,10 +18,11 @@ import type {
   SurfaceChange,
   SurfaceDelta,
   Touched,
+  UnprovenCause,
 } from "../model.ts"
 
 export type SurfaceOutcome = PackageBrief["surface"] & {
-  truncatedOnUsedEntry?: boolean
+  incomplete?: boolean
   blindSpots?: Counted<BlindSpotKind>[]
 }
 
@@ -133,46 +134,56 @@ export async function analyzeSurface(
     }
   }
 
-  const touched: Touched[] = []
-  const consider = (bucket: Touched["bucket"], change: SurfaceChange) => {
+  const sitesOf = (
+    change: SurfaceChange,
+    takesChildren: boolean
+  ): Pick<Touched, "strength" | "sites"> | undefined => {
     const all = [change.path, ...change.alsoAt]
     const strongSites: Site[] = []
     for (const path of all) {
       strongSites.push(...(byPath.get(path) ?? []))
-      if (bucket === "removed") {
+      if (takesChildren) {
         // a removed namespace or type takes every path under it
         for (const [used, sites] of byPath)
           if (used.startsWith(`${path}.`) || used.startsWith(`${path}#`))
             strongSites.push(...sites)
       }
     }
-    if (strongSites.length > 0) {
-      touched.push({
-        change,
-        bucket,
-        strength: "strong",
-        sites: uniqueSites(strongSites),
-      })
-      return
-    }
+    if (strongSites.length > 0)
+      return { strength: "strong", sites: uniqueSites(strongSites) }
     // a member you reach through a value the walk lost track of: same name, possibly the same thing
     if (all.some((p) => parsePath(p).segs.at(-1)?.sep === "#")) {
       const sites = byMember.get(lastName(change.path))
       if (sites && sites.length > 0)
-        touched.push({
-          change,
-          bucket,
-          strength: "weak",
-          sites: uniqueSites(sites),
-        })
+        return { strength: "weak", sites: uniqueSites(sites) }
     }
+    return undefined
+  }
+  const touched: Touched[] = []
+  const consider = (bucket: Touched["bucket"], change: SurfaceChange) => {
+    const hit = sitesOf(change, bucket === "removed")
+    if (hit) touched.push({ change, bucket, ...hit })
   }
   for (const ch of delta.removed) consider("removed", ch)
   for (const ch of delta.changed) consider("changed", ch)
   for (const ch of delta.deprecated) consider("deprecated", ch)
 
+  // gone from the new types, which could not have shown them: a reason to look, never a removal
+  const unproven = new Map<UnprovenCause, number>()
+  const movedTo = new Set<string>()
+  for (const ch of delta.unproven) {
+    if (!sitesOf(ch, true)) continue
+    unproven.set(ch.cause, (unproven.get(ch.cause) ?? 0) + 1)
+    if (ch.cause === "external-reexport") {
+      const { prefix } = parsePath(ch.path)
+      for (const [subpath, e] of Object.entries(b.surface.entries))
+        if (entryPrefix(b.surface.pkg, subpath) === prefix)
+          for (const name of e.externalReexports ?? []) movedTo.add(name)
+    }
+  }
+
   const usedEntries = new Set(wanted)
-  const truncatedOnUsedEntry =
+  const truncated =
     a.surface.flags.includes("symbol-cap") ||
     b.surface.flags.includes("symbol-cap") ||
     [...usedEntries].some(
@@ -181,16 +192,18 @@ export async function analyzeSurface(
         (a.surface.flags.includes("wildcard-truncated") ||
           b.surface.flags.includes("wildcard-truncated"))
     )
+  const detail = incompleteDetail(c.to, unproven, [...movedTo], truncated)
 
   return {
     status: "computed",
+    ...(detail ? { detail } : {}),
     changes: surfaceChangeCount(delta),
     added: delta.added.length,
     touched: touched.sort(
       (x, y) =>
         order(x) - order(y) || x.change.path.localeCompare(y.change.path)
     ),
-    truncatedOnUsedEntry,
+    incomplete: !!detail,
     ...(missing.length > 0
       ? {
           blindSpots: [
@@ -203,6 +216,32 @@ export async function analyzeSurface(
         }
       : {}),
   }
+}
+
+function incompleteDetail(
+  to: string,
+  unproven: Map<UnprovenCause, number>,
+  movedTo: string[],
+  truncated: boolean
+): string | undefined {
+  const parts: string[] = []
+  const names = (n: number) => `${n} ${n === 1 ? "name" : "names"} you use`
+  const reexport = unproven.get("external-reexport")
+  if (reexport)
+    parts.push(
+      `${names(reexport)} may have moved to ${movedTo.join(", ")}, which ${to} re-exports and radius does not follow`
+    )
+  const inherited = unproven.get("unresolved-base")
+  if (inherited)
+    parts.push(
+      `${names(inherited)} may be inherited from a type ${to} imports from another package, which is not followed`
+    )
+  const capped =
+    (unproven.get("symbol-cap") ?? 0) + (unproven.get("subpath-cap") ?? 0)
+  if (capped)
+    parts.push(`${names(capped)} lie past what radius reads of ${to}'s types`)
+  else if (truncated) parts.push("the type surface was cut short")
+  return parts.length > 0 ? parts.join("; ") : undefined
 }
 
 function order(t: Touched): number {

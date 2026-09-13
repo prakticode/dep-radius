@@ -28,6 +28,7 @@ function counts(a: string, b: string) {
   const d = diffSurfaces(surface(a), surface(b))
   return {
     removed: d.removed.map((c) => c.path),
+    unproven: d.unproven.map((c) => `${c.cause} ${c.path}`),
     changed: d.changed.map((c) => c.path),
     widened: d.widened.map((c) => c.path),
     deprecated: d.deprecated.map((c) => c.path),
@@ -37,6 +38,7 @@ function counts(a: string, b: string) {
 
 const none = {
   removed: [],
+  unproven: [],
   changed: [],
   widened: [],
   deprecated: [],
@@ -105,6 +107,94 @@ describe("surface delta", () => {
         "export declare function k(): void"
       ).removed
     ).toEqual(["p:A"])
+  })
+
+  it("follows a namespace that became an alias of `default`", () => {
+    // zod 3.25: `export { z }` next to `export default z` walks as `lib:default`, `lib:z` its alias
+    const ns = "declare namespace z { function object(a: string): void }"
+    expect(
+      counts(`${ns}\nexport { z }`, `${ns}\nexport { z }\nexport default z`)
+    ).toEqual({ ...none, added: ["p:default"] })
+  })
+
+  it("follows a name that the old surface reached through an alias", () => {
+    // @types/ws 8.18: `WebSocketServer` leaves the default namespace and stays a named export
+    const a =
+      "declare namespace ws { interface WebSocketServer { close(): void } }\nexport default ws\nexport import WebSocketServer = ws.WebSocketServer"
+    const b =
+      "export interface WebSocketServer { close(): void }\ndeclare namespace ws {}\nexport default ws"
+    expect(counts(a, b).removed).toEqual([])
+  })
+
+  it("does not call a name removed when it may come from an unfollowed `export *`", () => {
+    // @tanstack/react-query 5.102: named re-exports replaced by `export * from "@tanstack/query-core"`
+    expect(
+      counts(
+        'export { QueryClient } from "query-core"\nexport declare function useQuery(): void',
+        'export * from "query-core"\nexport declare function useQuery(): void'
+      )
+    ).toEqual({
+      ...none,
+      unproven: ["external-reexport p:QueryClient"],
+    })
+  })
+
+  it("does not call a member removed when the new class extends a type it cannot load", () => {
+    // msw 2.15: `class HttpResponse extends FetchResponse`, imported from @mswjs/interceptors
+    expect(
+      counts(
+        "export declare class R extends Response { static redirect(url: string): Response }",
+        'import { FetchResponse } from "interceptors"\nexport declare class R extends FetchResponse {}'
+      ).unproven
+    ).toContain("unresolved-base p:R#headers")
+    expect(
+      counts(
+        "export declare class R extends Response {}\nexport type S = R",
+        'import { FetchResponse } from "interceptors"\nexport declare class R extends FetchResponse {}\nexport type S = R'
+      ).unproven
+    ).toContain("unresolved-base p:S#headers")
+  })
+
+  it("does not call a name removed when the new surface stopped at the symbol cap", () => {
+    const a = surface(
+      "export declare function h(): void\nexport declare function k(): void"
+    )
+    const b = surface("export declare function k(): void")
+    b.flags = ["symbol-cap"]
+    expect(diffSurfaces(a, b).unproven.map((c) => c.path)).toEqual(["p:h"])
+    expect(diffSurfaces(a, b).removed).toEqual([])
+  })
+
+  it("does not let a named re-export from another package hide removals", () => {
+    expect(
+      counts(
+        'export declare const MAX: number\nexport { Data } from "interceptors"',
+        'export { Data } from "interceptors"'
+      ).removed
+    ).toEqual(["p:MAX"])
+  })
+
+  it("keeps a removal it can prove", () => {
+    // eslint-plugin-react-hooks 6.1: the named `configs` export became a property of `default`
+    expect(
+      counts(
+        "export declare const configs: { recommended: string }",
+        "declare const plugin: { configs: { recommended: string } }\nexport { plugin as default }"
+      ).removed
+    ).toEqual(["p:configs"])
+  })
+
+  it("calls a namespace that gains a signature a widening", () => {
+    expect(
+      counts(
+        "declare namespace ws { interface Options { a: string } }\nexport default ws",
+        "declare class ws { constructor(a: string) }\ndeclare namespace ws { interface Options { a: string } }\nexport default ws"
+      )
+    ).toEqual({
+      ...none,
+      widened: ["p:default"],
+      added: ["p:default.prototype"],
+    })
   })
 
   it("collapses one change seen through several paths", () => {

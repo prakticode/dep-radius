@@ -216,6 +216,8 @@ export interface SurfaceSymbol {
   returns?: CanonPath
   instanceOf?: CanonPath
   aliasOf?: CanonPath
+  // a class or interface extending a type the surface cannot load: its inherited members are unseen
+  unresolvedBase?: true
 }
 
 export type SurfaceFlag =
@@ -245,8 +247,17 @@ export interface SurfaceChange {
   alsoAt: CanonPath[]
 }
 
+// Missing from the new surface, but the new surface could not have shown it: not proof of a removal
+export type UnprovenCause =
+  "external-reexport" | "symbol-cap" | "subpath-cap" | "unresolved-base"
+
+export interface UnprovenRemoval extends SurfaceChange {
+  cause: UnprovenCause
+}
+
 export interface SurfaceDelta {
   removed: SurfaceChange[]
+  unproven: UnprovenRemoval[]
   changed: SurfaceChange[]
   deprecated: SurfaceChange[]
   widened: SurfaceChange[]

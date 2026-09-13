@@ -1,21 +1,27 @@
-import { parsePath } from "../symbol-path.ts"
+import { entryPrefix, parsePath } from "../symbol-path.ts"
 import type {
   CanonPath,
   Surface,
   SurfaceChange,
   SurfaceDelta,
   SurfaceSymbol,
+  UnprovenCause,
+  UnprovenRemoval,
 } from "../model.ts"
 
 // A pure function of two surfaces: identical for everyone who compares these two versions.
 export function diffSurfaces(a: Surface, b: Surface): SurfaceDelta {
-  const raw: Record<keyof SurfaceDelta, SurfaceChange[]> = {
+  const raw: Record<
+    Exclude<keyof SurfaceDelta, "unproven">,
+    SurfaceChange[]
+  > = {
     removed: [],
     changed: [],
     deprecated: [],
     widened: [],
     added: [],
   }
+  const unproven: UnprovenRemoval[] = []
   // a type from a dependency the virtual host cannot load prints as `any` on one side and by name
   // on the other when a declaration merely adds an annotation: not a change anyone can act on
   const lenient =
@@ -31,22 +37,37 @@ export function diffSurfaces(a: Surface, b: Surface): SurfaceDelta {
     return cur.sig
   }
 
+  const aliasesInA = new Map<CanonPath, CanonPath[]>()
+  for (const [path, sym] of Object.entries(a.symbols))
+    if (sym.aliasOf)
+      aliasesInA.set(sym.aliasOf, [
+        ...(aliasesInA.get(sym.aliasOf) ?? []),
+        path,
+      ])
+
   for (const [path, before] of Object.entries(a.symbols)) {
-    const after = b.symbols[path]
+    const after = findMoved(b, path, aliasesInA)
     if (!after) {
-      raw.removed.push({
+      const change = {
         path,
         kind: before.kind,
         before: sigOf(a, before),
         alsoAt: [],
-      })
+      }
+      const cause = unprovenCause(b, path)
+      if (cause) unproven.push({ ...change, cause })
+      else raw.removed.push(change)
       continue
     }
     if (before.kind === "namespace" && after.kind === "namespace") continue
     const sa = sigOf(a, before)
     const sb = sigOf(b, after)
     if (!sameMultiset(sa, sb) && !(lenient && sameModuloAny(sa, sb))) {
-      raw[isWidening(sa, sb) ? "widened" : "changed"].push({
+      // a namespace or a call-less interface that gains signatures breaks no use of its members
+      const gainsSignatures =
+        sa.length === 0 &&
+        (before.kind === "namespace" || before.kind === "interface")
+      raw[gainsSignatures || isWidening(sa, sb) ? "widened" : "changed"].push({
         path,
         kind: after.kind,
         before: sa,
@@ -75,11 +96,68 @@ export function diffSurfaces(a: Surface, b: Surface): SurfaceDelta {
 
   return {
     removed: collapse(dropChildrenOfRemoved(raw.removed)),
+    unproven: dropChildrenOfRemoved(unproven),
     changed: collapse(raw.changed),
     deprecated: collapse(raw.deprecated),
     widened: collapse(raw.widened),
     added: collapse(dropChildrenOfRemoved(raw.added)),
   }
+}
+
+// The same symbol under another name: `export { z }` and `export default z` walk as `lib:default`,
+// with `lib:z` an alias of it, so `lib:z.object` lives at `lib:default.object`.
+function resolveIn(
+  s: Surface,
+  path: CanonPath,
+  depth = 0
+): SurfaceSymbol | undefined {
+  const direct = s.symbols[path]
+  if (direct || depth > 4) return direct
+  for (const prefix of ancestors(path)) {
+    const target = s.symbols[prefix]?.aliasOf
+    if (target)
+      return resolveIn(s, target + path.slice(prefix.length), depth + 1)
+  }
+  return undefined
+}
+
+// A path gone from the new surface that the old surface also reached under another name, still
+// present: `ws:default.WebSocketServer` was also `ws:WebSocketServer`, which remains.
+function findMoved(
+  b: Surface,
+  path: CanonPath,
+  aliasesInA: Map<CanonPath, CanonPath[]>
+): SurfaceSymbol | undefined {
+  const found = resolveIn(b, path)
+  if (found) return found
+  for (const prefix of [path, ...ancestors(path)]) {
+    for (const alias of aliasesInA.get(prefix) ?? []) {
+      const moved = resolveIn(b, alias + path.slice(prefix.length))
+      if (moved) return moved
+    }
+  }
+  return undefined
+}
+
+// Longest first: `lib:a.b#c` gives `lib:a.b`, then `lib:a`.
+function ancestors(path: CanonPath): CanonPath[] {
+  const out: CanonPath[] = []
+  for (let p = parentOf(path); p; p = parentOf(p)) out.push(p)
+  return out
+}
+
+function unprovenCause(b: Surface, path: CanonPath): UnprovenCause | undefined {
+  const { prefix } = parsePath(path)
+  const entry = Object.entries(b.entries).find(
+    ([subpath]) => entryPrefix(b.pkg, subpath) === prefix
+  )?.[1]
+  // a member of a class still there is explained by its base before anything about the entry
+  if (ancestors(path).some((p) => resolveIn(b, p)?.unresolvedBase))
+    return "unresolved-base"
+  if (entry?.externalReexports?.length) return "external-reexport"
+  if (b.flags.includes("symbol-cap")) return "symbol-cap"
+  if (!entry && b.flags.includes("wildcard-truncated")) return "subpath-cap"
+  return undefined
 }
 
 function sameMultiset(a: string[], b: string[]): boolean {
@@ -137,7 +215,7 @@ function parentOf(path: CanonPath): CanonPath | undefined {
 }
 
 // A removed class takes its members with it: report the class.
-function dropChildrenOfRemoved(changes: SurfaceChange[]): SurfaceChange[] {
+function dropChildrenOfRemoved<T extends SurfaceChange>(changes: T[]): T[] {
   const paths = new Set(changes.map((c) => c.path))
   return changes.filter((c) => {
     for (let p = parentOf(c.path); p; p = parentOf(p))

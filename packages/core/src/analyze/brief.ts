@@ -16,7 +16,7 @@ export interface BriefParts {
   dep: InstalledDep
   candidate: Candidate
   usage: PackageUsage | undefined
-  surface: PackageBrief["surface"] & { truncatedOnUsedEntry?: boolean }
+  surface: PackageBrief["surface"] & { incomplete?: boolean }
   notes: CollectedNotes | undefined
   match: MatchResult | undefined
   notesDisabled: boolean
@@ -55,7 +55,7 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
     surface,
     notes,
   })
-  const { truncatedOnUsedEntry: _t, ...surfaceOut } = surface
+  const { incomplete: _i, ...surfaceOut } = surface
   return {
     pkg: dep.name,
     from: candidate.from,
