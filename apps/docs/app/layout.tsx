@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { Analytics } from "@vercel/analytics/next"
 import { RootProvider } from "fumadocs-ui/provider/next"
 
 import { appName, tagline } from "@/lib/shared"
@@ -29,6 +30,8 @@ export default function Layout({ children }: LayoutProps<"/">) {
     <html lang="en" className={inter.className} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <RootProvider>{children}</RootProvider>
+        {/* Vercel Web Analytics: page views and referrers, without cookies */}
+        <Analytics />
       </body>
     </html>
   )
