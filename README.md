@@ -13,14 +13,34 @@ npx dep-radius --since main    # what changed on this branch, for a pull request
 
 The command, its options and what the verdicts mean: [packages/cli](packages/cli/README.md).
 
+## On pull requests
+
+```yaml
+# .github/workflows/dep-radius.yml
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prakticode/dep-radius@v0
+```
+
+One comment on every pull request that changes a dependency: the verdict and the lines concerned,
+edited on every push. Inputs and outputs are in [`action.yml`](action.yml).
+
 ## Packages
 
-| Package                                                  | npm                | What it is                      |
-| -------------------------------------------------------- | ------------------ | ------------------------------- |
-| [`packages/cli`](packages/cli)                           | `dep-radius`       | The `radius` command            |
-| [`packages/core`](packages/core)                         | `@dep-radius/core` | The engine, usable as a library |
-| [`tooling/eslint-config`](tooling/eslint-config)         | private            | Shared ESLint rules             |
-| [`tooling/typescript-config`](tooling/typescript-config) | private            | Shared TypeScript settings      |
+| Package                                                  | npm                | What it is                                                           |
+| -------------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
+| [`packages/cli`](packages/cli)                           | `dep-radius`       | The `radius` command                                                 |
+| [`packages/core`](packages/core)                         | `@dep-radius/core` | The engine, usable as a library                                      |
+| [`packages/action`](packages/action)                     | private            | The GitHub Action's report step, run from [`action.yml`](action.yml) |
+| [`tooling/eslint-config`](tooling/eslint-config)         | private            | Shared ESLint rules                                                  |
+| [`tooling/typescript-config`](tooling/typescript-config) | private            | Shared TypeScript settings                                           |
 
 `@dep-radius/core` and `dep-radius` are released together, with the same version.
 
