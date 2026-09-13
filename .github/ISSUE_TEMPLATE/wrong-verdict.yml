@@ -1,0 +1,49 @@
+name: Wrong verdict
+description: radius said quiet on an update that broke something, or reviewed or blocked one that was fine
+labels: ["wrong verdict"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports are how radius gets trustworthy. The more precise, the faster the fix.
+  - type: input
+    id: update
+    attributes:
+      label: The update
+      placeholder: "some-package 2.3.1 -> 2.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: What radius said
+      options:
+        - quiet, but it broke something
+        - review, but nothing concerned me
+        - blocked, but nothing was removed
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What actually happened
+      description: The error, the changed behaviour, or why the verdict was wrong. A link to a commit or pull request helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: usage
+    attributes:
+      label: How your code uses the package
+      description: A few lines are enough. Remove anything private.
+      render: ts
+  - type: textarea
+    id: json
+    attributes:
+      label: The brief
+      description: "The output of `npx dep-radius <package>@<version> --json`, or the part about this package."
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: radius version
+      placeholder: "npx dep-radius --version"

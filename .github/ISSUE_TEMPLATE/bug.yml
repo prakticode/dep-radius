@@ -1,0 +1,32 @@
+name: Bug
+description: radius crashed, hung, or printed something wrong
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: project
+    attributes:
+      label: The project
+      description: Package manager and version, one repository or several packages, TypeScript or JavaScript.
+  - type: input
+    id: version
+    attributes:
+      label: radius version
+      placeholder: "npx dep-radius --version"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: "node --version"

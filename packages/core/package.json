@@ -1,0 +1,79 @@
+{
+  "name": "@dep-radius/core",
+  "version": "0.0.0",
+  "description": "The engine behind radius: which changes in a dependency update land on code you actually wrote.",
+  "license": "MIT",
+  "author": "prakticode",
+  "homepage": "https://github.com/prakticode/dep-radius#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prakticode/dep-radius.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/prakticode/dep-radius/issues"
+  },
+  "keywords": [
+    "dependencies",
+    "upgrade",
+    "semver",
+    "changelog",
+    "release-notes",
+    "renovate",
+    "dependabot",
+    "breaking-changes",
+    "typescript",
+    "library",
+    "static-analysis"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./render": {
+      "types": "./dist/render/index.d.ts",
+      "default": "./dist/render/index.js"
+    },
+    "./debug": {
+      "types": "./dist/debug.d.ts",
+      "default": "./dist/debug.js"
+    },
+    "./schema/brief-v1.schema.json": "./schema/brief-v1.schema.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0",
+    "lint:fix": "eslint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "backtest": "node scripts/backtest.ts",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "semver": "^7.8.0",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@types/semver": "^7.7.0",
+    "eslint": "^9.39.5",
+    "vitest": "^5.0.0"
+  }
+}

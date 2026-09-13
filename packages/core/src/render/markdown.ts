@@ -1,0 +1,84 @@
+import type { Brief, PackageBrief } from "../model.ts"
+import {
+  ago,
+  coverageLabel,
+  groupBriefs,
+  oneNetOnly,
+  opaqueLabel,
+  siteLabel,
+  sitesFor,
+  surfaceLabel,
+} from "./groups.ts"
+
+// A pull request comment: one table, then a section per package that needs a look.
+export function renderMarkdown(brief: Brief, now: number): string {
+  const g = groupBriefs(brief)
+  const out: string[] = []
+  const icon = { blocked: "🛑 blocked", review: "👀 review", quiet: "✅ quiet" }
+  out.push("### radius")
+  out.push("")
+  if (brief.packages.length === 0) {
+    out.push("No dependency has an eligible update.")
+    return `${out.join("\n")}\n`
+  }
+  out.push(
+    "| package | update | verdict | surface changes | changes you touch | notes mentioning you |"
+  )
+  out.push("| --- | --- | --- | --- | --- | --- |")
+  for (const p of [...g.detailed, ...g.unseen, ...g.quiet]) {
+    const direct = p.notes.matched.filter((m) => m.direct).length
+    const possibly = p.notes.matched.length - direct
+    out.push(
+      `| \`${p.pkg}\` | ${p.from} → ${p.to} (${p.bump}) | ${icon[p.verdict]}${oneNetOnly(p) ? " (one net)" : ""} | ${surfaceLabel(p)} | ${p.surface.status === "computed" ? p.surface.touched.length : "n/a"} | ${p.notes.coverage === "disabled" ? "not read" : `${direct}${possibly ? ` (+${possibly} possibly)` : ""}`} |`
+    )
+  }
+  out.push("")
+  for (const p of g.detailed) out.push(...section(p, now), "")
+  if (g.unseen.length > 0) {
+    out.push("<details><summary>Cannot see how you use these</summary>", "")
+    for (const p of g.unseen)
+      out.push(`- \`${p.pkg}\` ${p.from} → ${p.to}: ${opaqueLabel(p)}`)
+    out.push("", "</details>", "")
+  }
+  if (brief.limits.length > 0) {
+    out.push("<details><summary>Limits</summary>", "")
+    for (const l of brief.limits) out.push(`- ${l}`)
+    out.push("", "</details>")
+  }
+  return `${out.join("\n")}\n`
+}
+
+function section(p: PackageBrief, now: number): string[] {
+  const lines: string[] = []
+  lines.push(`#### \`${p.pkg}\` ${p.from} → ${p.to}`)
+  lines.push("")
+  lines.push(
+    `Published ${ago(p.publishedAt, now)} · ${coverageLabel(p)} · used in ${p.usage.files} files`
+  )
+  lines.push("")
+  for (const t of p.surface.touched) {
+    lines.push(
+      `- **${t.bucket}** \`${t.change.path}\`${t.strength === "weak" ? " (by member name)" : ""}`
+    )
+    for (const s of t.sites.slice(0, 5)) lines.push(`  - \`${siteLabel(s)}\``)
+  }
+  for (const m of p.notes.matched) {
+    const names = [...new Set(m.hits.map((h) => h.name))]
+    lines.push(
+      `- ${m.entry.version}: ${m.entry.title}${m.direct ? "" : " _(possibly)_"}. You use ${names.map((n) => `\`${n}\``).join(", ")}`
+    )
+    const strong = m.hits
+      .filter((h) => h.strength === "strong")
+      .map((h) => h.name)
+    for (const s of sitesFor(p, strong.length > 0 ? strong : names).slice(
+      0,
+      m.direct ? 3 : 1
+    ))
+      lines.push(`  - \`${siteLabel(s)}\``)
+  }
+  for (const e of p.notes.unattributedBreaking)
+    lines.push(`- ${e.version}: ${e.title} _(breaking, names no API)_`)
+  lines.push("")
+  lines.push(`<sub>${p.reasons.map((r) => r.detail).join(" · ")}</sub>`)
+  return lines
+}
