@@ -37,9 +37,18 @@ jobs:
       # With pending changesets: opens or updates the "version packages" pull request.
       # Once that pull request is merged: builds and publishes both packages, tags, and creates
       # the GitHub releases. Provenance is attached automatically by trusted publishing.
-      - uses: changesets/action@v2
+      - id: changesets
+        uses: changesets/action@v2
         with:
           version-script: pnpm version-packages
           publish-script: pnpm release
           commit-message: "chore(release): version packages"
           pr-title: "chore(release): version packages"
+      # The GitHub Action is used as prakticode/dep-radius@v0 or @v0.2.0, and runs the CLI of the
+      # same version: both tags follow each publish. Tags are not covered by the main ruleset.
+      - if: steps.changesets.outputs.published == 'true'
+        run: |
+          version=$(node -p 'require("./packages/cli/package.json").version')
+          git tag -f "v$version"
+          git tag -f "v${version%%.*}"
+          git push -f origin "v$version" "v${version%%.*}"

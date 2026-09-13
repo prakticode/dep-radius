@@ -73,3 +73,14 @@ jobs:
           code=$?
           echo "radius exited with $code"
           test "$code" -le 2
+      # --since as the GitHub Action runs it: a commit to compare with, versions from the lockfile
+      - name: run --since on this repository
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          "$RUNNER_TEMP/consumer/node_modules/.bin/radius" --since HEAD --json > "$RUNNER_TEMP/since.json"
+          code=$?
+          echo "radius exited with $code"
+          test "$code" -le 2 || exit 1
+          node -e 'const b = require(process.argv[1]); if (b.since?.commit !== process.argv[2]) process.exit(1)' "$RUNNER_TEMP/since.json" "$(git rev-parse HEAD)"

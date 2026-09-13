@@ -1,0 +1,27 @@
+{
+  "name": "@dep-radius/action",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The GitHub Action: the radius brief as a sticky pull request comment. Run from action.yml at the repository root, never published to npm.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0",
+    "lint:fix": "eslint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf .turbo"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.0"
+  }
+}

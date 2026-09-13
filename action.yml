@@ -1,0 +1,103 @@
+name: dep-radius
+description: Which changes in a dependency update land on your code. One comment on every pull request that changes a dependency.
+author: prakticode
+branding:
+  icon: target
+  color: blue
+
+inputs:
+  github-token:
+    description: "Comments on the pull request and lifts GitHub's limit on release notes. The job needs `pull-requests: write` to comment."
+    default: ${{ github.token }}
+  base:
+    description: The commit to compare with. Defaults to the base of the pull request.
+    default: ${{ github.event.pull_request.base.sha }}
+  working-directory:
+    description: The folder radius reads, inside the repository.
+    default: .
+  comment:
+    description: Keep one comment on the pull request up to date. `false` writes the brief to the job summary only.
+    default: "true"
+  fail-on:
+    description: Fail the step on `blocked` (an export you use was removed), on `review` as well, or `never`.
+    default: blocked
+  version:
+    description: The dep-radius version to run. Defaults to the one released with this Action.
+    default: ""
+  args:
+    description: Extra radius options, such as `--prod` or `--no-notes`.
+    default: ""
+
+outputs:
+  verdict:
+    description: "`quiet`, `review`, `blocked`, or `none` when no direct dependency changed version."
+    value: ${{ steps.report.outputs.verdict }}
+  exit-code:
+    description: The radius exit code, 0 quiet, 1 review, 2 blocked.
+    value: ${{ steps.report.outputs.exit-code }}
+  json:
+    description: Path to the brief as JSON (schemaVersion 1).
+    value: ${{ steps.report.outputs.json }}
+  markdown:
+    description: Path to the brief as Markdown.
+    value: ${{ steps.report.outputs.markdown }}
+
+runs:
+  using: composite
+  steps:
+    - id: node
+      shell: bash
+      # the report runs TypeScript directly, which Node does unflagged from 22.18
+      run: |
+        if node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 18) ? 0 : 1)' 2>/dev/null; then
+          echo "recent=true" >> "$GITHUB_OUTPUT"
+        fi
+    - if: steps.node.outputs.recent != 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    - id: brief
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BASE: ${{ inputs.base }}
+        VERSION: ${{ inputs.version }}
+        ARGS: ${{ inputs.args }}
+        ACTION_PATH: ${{ github.action_path }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        if [ -z "$BASE" ]; then
+          echo "::error title=dep-radius::no commit to compare with. Run on pull_request, or set the base input."
+          exit 1
+        fi
+        # actions/checkout fetches one commit; the base is one more, and only its manifests are read
+        if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          git fetch --no-tags --depth=1 origin "$BASE"
+        fi
+        if [ -z "$VERSION" ]; then
+          VERSION=$(node -p 'require(process.argv[1]).version' "$ACTION_PATH/packages/cli/package.json")
+        fi
+        out="$RUNNER_TEMP/dep-radius"
+        mkdir -p "$out"
+        echo "RADIUS_OUT_DIR=$out" >> "$GITHUB_ENV"
+        code=0
+        # ARGS is split into words on purpose: several options in one input
+        # shellcheck disable=SC2086
+        npx --yes "dep-radius@$VERSION" --since "$BASE" --json $ARGS > "$out/brief.json" || code=$?
+        if [ "$code" -ge 3 ]; then
+          echo "::error title=dep-radius::radius failed (exit $code), see the log above"
+          exit "$code"
+        fi
+        # the same brief again, from the cache the first run filled
+        # shellcheck disable=SC2086
+        npx --yes "dep-radius@$VERSION" --since "$BASE" --markdown --offline $ARGS > "$out/brief.md" || [ $? -lt 3 ]
+
+    - id: report
+      shell: bash
+      env:
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+      run: node "$GITHUB_ACTION_PATH/packages/action/src/main.ts"
