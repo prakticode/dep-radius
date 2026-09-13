@@ -12,6 +12,7 @@ import { getPackument } from "./registry/packument.ts"
 import { buildInventory } from "./inventory/installed.ts"
 import { selectCandidate } from "./registry/candidates.ts"
 import { listProjectFiles } from "./inventory/manifests.ts"
+import { planSince, readBaseTree } from "./inventory/since.ts"
 import { isAgeExcluded, loadRegistryConfig } from "./registry/npmrc.ts"
 import { analyzeSurface, type SurfaceOutcome } from "./surface/analyze.ts"
 import {
@@ -62,6 +63,10 @@ export async function run(
   const minAgeMs =
     opts.minAgeMs ?? cfg.minimumReleaseAgeMs ?? DEFAULT_MIN_AGE_MS
   const specs = opts.specs.map(parseSpec)
+  if (opts.since && (opts.latest || specs.some((s) => s.version)))
+    throw new Error(
+      "--since compares with a commit, so it takes package names only, without --latest or @version"
+    )
 
   const notAnalyzed: NotAnalyzed[] = [...inventory.notAnalyzed]
   let targets: InstalledDep[] = inventory.installed
@@ -85,6 +90,29 @@ export async function run(
         })
       }
     }
+  }
+  let since: Brief["since"]
+  // with --since, the version a dependency has now is the target, whatever its age
+  const sinceTargets = new Map<InstalledDep, string>()
+  let unchanged = 0
+  if (opts.since) {
+    const base = await readBaseTree(root, opts.since)
+    let baseInventory
+    try {
+      baseInventory = await buildInventory(
+        base.dir,
+        { prod: opts.prod },
+        await listProjectFiles(base.dir)
+      )
+    } finally {
+      await base.cleanup()
+    }
+    since = { ref: base.ref, commit: base.commit }
+    const plan = planSince(targets, baseInventory, base.ref)
+    targets = plan.changed.map((c) => c.dep)
+    for (const c of plan.changed) sinceTargets.set(c.dep, c.to)
+    unchanged = plan.unchanged
+    notAnalyzed.push(...plan.added)
   }
   const scanned =
     targets.length > 0
@@ -119,7 +147,11 @@ export async function run(
       minAgeMs,
       ageExcluded: (v) => isAgeExcluded(cfg, dep.name, v),
       latest: opts.latest,
-      ...(spec?.version ? { explicit: spec.version } : {}),
+      ...(sinceTargets.has(dep)
+        ? { explicit: sinceTargets.get(dep) }
+        : spec?.version
+          ? { explicit: spec.version }
+          : {}),
     })
     if (choice.kind === "error") {
       notAnalyzed.push({ pkg: dep.name, reason: choice.reason })
@@ -202,9 +234,10 @@ export async function run(
     tool: { version: toolVersion(), typescript: ts.version },
     root,
     generatedAt: new Date(ctx.now).toISOString(),
+    ...(since ? { since } : {}),
     manifests: inventory.manifests.length,
     packages: briefs,
-    upToDate,
+    upToDate: upToDate + unchanged,
     notAnalyzed: dedupeNotAnalyzed(notAnalyzed),
     global: scanned.global,
     limits: limitsFor(briefs, scanned.global),

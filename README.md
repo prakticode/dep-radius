@@ -7,7 +7,8 @@
 Which changes in a dependency update land on code you actually wrote.
 
 ```sh
-npx dep-radius
+npx dep-radius                 # every dependency with an update waiting
+npx dep-radius --since main    # what changed on this branch, for a pull request or an AI agent
 ```
 
 The command, its options and what the verdicts mean: [packages/cli](packages/cli/README.md).

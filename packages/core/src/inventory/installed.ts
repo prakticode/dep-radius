@@ -66,7 +66,16 @@ export async function resolveInstalled(
   }
 }
 
-async function loadLock(root: string): Promise<LockReader | undefined> {
+interface FoundLock {
+  reader: LockReader
+  // the folder of the lockfile: its entries are keyed by paths relative to it
+  dir: string
+}
+
+// The nearest lockfile, from `root` up to the repository root: a package of a monorepo has none of
+// its own. Outside a repository only `root` itself is looked at, so a stray lockfile in a parent
+// folder never answers for a project.
+async function loadLock(root: string): Promise<FoundLock | undefined> {
   const tries: [string, (t: string) => LockReader | undefined][] = [
     ["pnpm-lock.yaml", pnpmLock],
     ["package-lock.json", npmLock],
@@ -74,17 +83,25 @@ async function loadLock(root: string): Promise<LockReader | undefined> {
     ["yarn.lock", yarnLock],
     ["bun.lock", bunLock],
   ]
-  for (const [file, reader] of tries) {
-    const p = join(root, file)
-    if (!existsSync(p)) continue
-    try {
-      const r = reader(await readFile(p, "utf8"))
-      if (r) return r
-    } catch {
-      // unreadable lockfile: fall through to the next source
+  const boundary = projectBoundary(root)
+  const inRepository = existsSync(join(boundary, ".git"))
+  let dir = root
+  for (;;) {
+    for (const [file, reader] of tries) {
+      const p = join(dir, file)
+      if (!existsSync(p)) continue
+      try {
+        const r = reader(await readFile(p, "utf8"))
+        if (r) return { reader: r, dir }
+      } catch {
+        // unreadable lockfile: fall through to the next source
+      }
     }
+    if (!inRepository || dir === boundary) return undefined
+    const parent = dirname(dir)
+    if (parent === dir) return undefined
+    dir = parent
   }
-  return undefined
 }
 
 async function patchedNames(root: string): Promise<Set<string>> {
@@ -145,8 +162,10 @@ export async function buildInventory(
   const manifests = await findManifests(root, projectFiles)
   const lock = await loadLock(root)
   const patched = await patchedNames(root)
+  const lockDir = lock?.dir ?? root
   const hasPnp =
-    existsSync(join(root, ".pnp.cjs")) || existsSync(join(root, ".pnp.js"))
+    existsSync(join(lockDir, ".pnp.cjs")) ||
+    existsSync(join(lockDir, ".pnp.js"))
 
   const byId = new Map<string, InstalledDep>()
   const local = new Set<string>()
@@ -229,7 +248,7 @@ async function resolveDep(
   root: string,
   m: Manifest,
   d: DeclaredDep,
-  lock: LockReader | undefined,
+  lock: FoundLock | undefined,
   hasPnp: boolean
 ): Promise<InstalledDep | undefined> {
   if (!hasPnp) {
@@ -251,15 +270,15 @@ async function resolveDep(
     }
   }
   if (lock) {
-    const hit = lock.lookup(relPath(root, m.dir), d.key, d.spec)
+    const hit = lock.reader.lookup(relPath(lock.dir, m.dir), d.key, d.spec)
     if (hit) {
       const flags: InstalledDep["flags"] = []
       if (hit.name !== d.key) flags.push("alias")
       return {
-        id: `${lock.source}:${hit.name}@${hit.version}`,
+        id: `${lock.reader.source}:${hit.name}@${hit.version}`,
         name: hit.name,
         version: hit.version,
-        versionSource: lock.source,
+        versionSource: lock.reader.source,
         local: false,
         declaredBy: [],
         flags,

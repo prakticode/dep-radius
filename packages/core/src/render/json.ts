@@ -86,6 +86,7 @@ export interface BriefV1 {
   tool: { name: "dep-radius"; version: string; typescript: string }
   root: string
   generatedAt: string
+  since?: { ref: string; commit: string }
   exitCode: 0 | 1 | 2
   summary: {
     manifests: number
@@ -114,6 +115,7 @@ export function toJsonV1(brief: Brief): BriefV1 {
     },
     root: brief.root,
     generatedAt: brief.generatedAt,
+    ...(brief.since ? { since: brief.since } : {}),
     exitCode: brief.exitCode,
     summary: {
       manifests: brief.manifests,

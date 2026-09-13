@@ -24,6 +24,8 @@ const HELP = `radius: which changes in a dependency update land on code you wrot
 usage
   radius [path]                      every direct dependency with an update waiting
   radius <pkg>[@<version|tag>] ...   only these packages (a version analyses that exact target)
+  radius --since <git-ref>           the dependencies whose version changed since that commit,
+                                     for a pull request or right after an upgrade
 
 options
   --json                 the brief as JSON (schemaVersion 1)
@@ -61,6 +63,7 @@ async function main(argv: string[]): Promise<number> {
         offline: { type: "boolean" },
         "min-age": { type: "string" },
         latest: { type: "boolean" },
+        since: { type: "string" },
         notes: { type: "boolean", default: true },
         surface: { type: "boolean", default: true },
         prod: { type: "boolean" },
@@ -87,6 +90,10 @@ async function main(argv: string[]): Promise<number> {
   }
   if (v.json && v.markdown) {
     process.stderr.write("radius: --json and --markdown cannot be combined\n")
+    return 3
+  }
+  if (v.since !== undefined && v.latest) {
+    process.stderr.write("radius: --since and --latest cannot be combined\n")
     return 3
   }
 
@@ -136,6 +143,7 @@ async function main(argv: string[]): Promise<number> {
     offline: !!v.offline,
     minAgeMs,
     latest: !!v.latest,
+    ...(v.since ? { since: v.since } : {}),
     notes: v.notes !== false,
     surface: v.surface !== false,
     prod: !!v.prod,

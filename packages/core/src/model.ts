@@ -389,6 +389,8 @@ export interface Brief {
   tool: { version: string; typescript: string }
   root: string
   generatedAt: string
+  // set when the brief compares the working tree with a commit instead of with the registry
+  since?: { ref: string; commit: string }
   manifests: number
   packages: PackageBrief[]
   upToDate: number

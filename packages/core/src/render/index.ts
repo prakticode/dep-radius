@@ -9,6 +9,7 @@ export {
   isUnseenOnly,
   oneNetOnly,
   opaqueLabel,
+  sinceLabel,
   siteLabel,
   sitesFor,
   surfaceLabel,

@@ -10,6 +10,7 @@ Which changes in a dependency update land on code you actually wrote.
 npx dep-radius                 # every direct dependency with an update waiting
 npx dep-radius schemakit       # one package
 npx dep-radius schemakit@3.2.0 # an exact target
+npx dep-radius --since main    # the dependencies whose version changed since that commit
 ```
 
 ```
@@ -56,9 +57,10 @@ quiet verdict that stood on one net only is marked `*`.
 
 ## Options
 
-`--json`, `--markdown` (a pull request comment), `--offline`, `--min-age <duration>` (default 1d, or
-the project's `minimumReleaseAge`), `--latest`, `--no-notes`, `--no-surface`, `--prod`, `--verbose`.
-Set `GITHUB_TOKEN`, or log in with `gh`, to lift GitHub's limit from 60 to 5000 requests an hour.
+`--json`, `--markdown` (a pull request comment), `--since <git-ref>` (compare with a commit, reading
+its lockfile, nothing installed), `--offline`, `--min-age <duration>` (default 1d, or the project's
+`minimumReleaseAge`), `--latest`, `--no-notes`, `--no-surface`, `--prod`, `--verbose`. Set
+`GITHUB_TOKEN`, or log in with `gh`, to lift GitHub's limit from 60 to 5000 requests an hour.
 
 `--json` is a stable contract, `schemaVersion: 1`, described by
 [`brief-v1.schema.json`](../core/schema/brief-v1.schema.json), shipped in `@dep-radius/core` as

@@ -5,6 +5,7 @@ import {
   groupBriefs,
   oneNetOnly,
   opaqueLabel,
+  sinceLabel,
   siteLabel,
   sitesFor,
   surfaceLabel,
@@ -17,8 +18,14 @@ export function renderMarkdown(brief: Brief, now: number): string {
   const icon = { blocked: "🛑 blocked", review: "👀 review", quiet: "✅ quiet" }
   out.push("### radius")
   out.push("")
+  if (brief.since)
+    out.push(`Dependency changes since ${sinceLabel(brief.since)}.`, "")
   if (brief.packages.length === 0) {
-    out.push("No dependency has an eligible update.")
+    out.push(
+      brief.since
+        ? "No direct dependency changed version."
+        : "No dependency has an eligible update."
+    )
     return `${out.join("\n")}\n`
   }
   out.push(
