@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      # the version commit, the git tags and the GitHub releases
+      # the version commit and the GitHub release
       contents: write
       # the "version packages" pull request
       pull-requests: write
@@ -35,8 +35,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       # With pending changesets: opens or updates the "version packages" pull request.
-      # Once that pull request is merged: builds and publishes both packages, tags, and creates
-      # the GitHub releases. Provenance is attached automatically by trusted publishing.
+      # Once that pull request is merged: builds and publishes both packages. Provenance is attached
+      # automatically by trusted publishing. The tags and the release come from the next step, so a
+      # version gets one tag and one release instead of one per package.
       - id: changesets
         uses: changesets/action@v2
         with:
@@ -44,11 +45,27 @@ jobs:
           publish-script: pnpm release
           commit-message: "chore(release): version packages"
           pr-title: "chore(release): version packages"
+          push-git-tags: false
+          create-github-releases: false
       # The GitHub Action is used as prakticode/dep-radius@v0 or @v0.2.0, and runs the CLI of the
       # same version: both tags follow each publish. Tags are not covered by the main ruleset.
+      # The workflow token may not create a tag on a commit that changes a workflow file, so the
+      # tags use RELEASE_TAG_TOKEN: a fine-grained token for this repository only, with Contents and
+      # Workflows write. The release itself uses the workflow token.
       - if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
+          WORKFLOW_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p 'require("./packages/cli/package.json").version')
-          git tag -f "v$version"
-          git tag -f "v${version%%.*}"
-          git push -f origin "v$version" "v${version%%.*}"
+          tag() {
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/$1" -f sha="$GITHUB_SHA" -F force=true ||
+              gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$1" -f sha="$GITHUB_SHA"
+          }
+          tag "v$version"
+          tag "v${version%%.*}"
+          awk -v heading="## $version" '$0 == heading { on = 1; next } /^## / { on = 0 } on' \
+            packages/cli/CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          GH_TOKEN="$WORKFLOW_TOKEN" gh release create "v$version" --verify-tag \
+            --title "v$version" --notes-file "$RUNNER_TEMP/notes.md"
