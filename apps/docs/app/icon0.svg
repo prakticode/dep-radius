@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="#0a3359">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      svg {
+        color: #b3e0ff;
+      }
+    }
+  </style>
+  <circle cx="12" cy="12" r="10" opacity="0.35" />
+  <circle cx="12" cy="12" r="6" opacity="0.7" />
+  <circle cx="12" cy="12" r="2" fill="currentColor" />
+</svg>
