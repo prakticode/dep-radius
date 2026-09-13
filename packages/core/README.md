@@ -2,7 +2,7 @@
 
 The engine behind [`dep-radius`](../cli/README.md): which changes in a dependency update land on
 code you actually wrote. Use it to build your own integration; for the command line, install
-`dep-radius`.
+`dep-radius`. The library guide: [depradius.com/docs/library](https://depradius.com/docs/library).
 
 ```ts
 import { createCtx, defaultCacheDir, renderJson, run, type Options } from "@dep-radius/core"
