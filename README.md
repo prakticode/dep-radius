@@ -11,7 +11,8 @@ npx dep-radius                 # every dependency with an update waiting
 npx dep-radius --since main    # what changed on this branch, for a pull request or an AI agent
 ```
 
-The command, its options and what the verdicts mean: [packages/cli](packages/cli/README.md).
+Documentation, including the guide for AI agents: [depradius.com](https://depradius.com). The
+command, its options and what the verdicts mean: [packages/cli](packages/cli/README.md).
 
 ## On pull requests
 
@@ -30,7 +31,8 @@ jobs:
 ```
 
 One comment on every pull request that changes a dependency: the verdict and the lines concerned,
-edited on every push. Inputs and outputs are in [`action.yml`](action.yml).
+edited on every push. Inputs and outputs are in [`action.yml`](action.yml), and the setup is in
+[the GitHub Action guide](https://depradius.com/docs/github-action).
 
 ## Packages
 

@@ -4,7 +4,8 @@
 [![CI](https://github.com/prakticode/dep-radius/actions/workflows/ci.yml/badge.svg)](https://github.com/prakticode/dep-radius/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/dep-radius)](LICENSE)
 
-Which changes in a dependency update land on code you actually wrote.
+Which changes in a dependency update land on code you actually wrote. Documentation:
+[depradius.com](https://depradius.com).
 
 ```sh
 npx dep-radius                 # every direct dependency with an update waiting

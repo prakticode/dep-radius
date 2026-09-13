@@ -4,7 +4,7 @@
   "description": "Tells you which changes in a dependency update land on code you actually wrote.",
   "license": "MIT",
   "author": "prakticode",
-  "homepage": "https://github.com/prakticode/dep-radius#readme",
+  "homepage": "https://depradius.com",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/prakticode/dep-radius.git",
