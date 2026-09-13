@@ -1,0 +1,138 @@
+---
+title: "zod 4.4.3 to 4.5.4: 422 type changes, 38 release notes, and one test to fix"
+description: A minor upgrade replayed with radius on a production Next.js app. What it pointed at, what turned out harmless, and the one change it did not connect.
+---
+
+The upgrade was zod 4.4.3 to 4.5.4, a minor. The kind of update most of us merge once CI is green. I
+wanted to know what was actually in it for my code, so I replayed it: the commit just before the
+upgrade, and `npx dep-radius zod@4.5.4` (radius 0.2.2).
+
+## The haystack
+
+Between those two versions, zod's type declarations changed in **422 places**. Five releases, 4.5.0
+to 4.5.4, carry **38 release note entries**: new APIs, performance work, fixes, and five entries
+marked with a warning sign.
+
+The project is a Next.js SaaS monorepo. zod is declared in three packages and used in **33 files, at
+151 sites**: form schemas, server actions, environment variables, tests. Most files don't import zod
+directly. They go through `apps/app/lib/zod.ts`, which re-exports it with the app's error messages,
+so searching for `from "zod"` misses most of the usage.
+
+The question was not "is zod 4.5 safe". It was: which of those 422 changes and 38 notes land on
+**this** code, and where.
+
+## What radius said
+
+```
+zod  4.4.3 → 4.5.4  minor  published 15d ago   REVIEW
+  surface changes ......... 422
+  changes you touch ....... 1
+  notes mentioning you .... 4  (+8 possibly)  of 38, notes for 5/5 versions (github-release)
+  used in 33 files, 151 sites · apps/app/package.json, apps/web/package.json, packages/auth/package.json
+
+  changed  zod:core.$RefinementCtx#issues  (by member name)
+    apps/app/features/auth/schemas/auth.test.ts:53
+    apps/app/features/auth/schemas/auth.test.ts:64
+    apps/app/features/auth/schemas/auth.test.ts:77
+    apps/app/features/members/schemas/invitation.test.ts:36
+
+  4.5.0  ⚠️ String length counts code points
+    you use: string, length, max, min
+    apps/app/features/account/schemas/account.ts:18  (via apps/app/lib/zod.ts)
+    apps/app/features/account/schemas/account.ts:37  (via apps/app/lib/zod.ts)
+    apps/app/features/account/schemas/account.ts:54  (via apps/app/lib/zod.ts)
+    ... 28 more sites
+  4.5.0  z.string().includes(sub, { position: N }) emits a JSON Schema pattern that allows *at least* N leading characters (#6024).
+  4.5.0  9x reduction in schema memory footprint
+  4.5.0  Symbol keys in z.object()
+  4.5.0  ⚠️ Record keys and intersections match TypeScript  possibly
+  ... 7 more notes (--verbose)
+
+  why: 1 changed member you may reach by name: zod:core.$RefinementCtx#issues
+  why: 12 release notes mention names you use (4 by name in the text)
+```
+
+Shortened here: each note lists the lines it concerns, like the first one.
+
+Out of 422 type changes, one reaches the code, and only by name. Out of 38 notes, 4 name something
+the code uses and 8 more match weakly. That is the list to read, instead of five releases.
+
+## Reading it
+
+**The one type change is a false lead, and radius says so.** `$RefinementCtx#issues` changed, and the
+tests read a property called `issues`. But they read it on a parse error
+(`parsed.error?.issues[0]?.message`), not on a refinement context. radius runs no type checker over
+my code, so a member reached through a value it lost track of is matched by name and marked
+`(by member name)`. The upgrade commit changed none of those four lines.
+
+**The note worth reading: string length counts code points.** `.min()`, `.max()` and `.length()`
+used to count UTF-16 code units, so one emoji counted as two. They now count code points. radius
+pointed at the 31 sites using `string`, `min`, `max` or `length`. Reading the note: `.max()` only
+gets looser, `.min()` and `.length()` get stricter for emoji and other astral characters. In this
+code, nine checks are `.min(1)`, where one emoji still passes, and one is a 32 character secret,
+which is ASCII. One is not neutral: a feedback message requires `.min(10)`, so a message of five
+to nine emoji, which used to pass, is now rejected. An edge case nobody will miss, but a real change
+in behaviour, found from a note and a line number.
+
+**Not every match is a problem, and they are shown anyway.** "9x reduction in schema memory
+footprint" mentions `string`, which the app uses. Harmless. It stays in the list because a tool that
+hides the matches it believes are harmless eventually hides the one that isn't. The weaker matches
+are labelled `possibly`, so they can be skimmed.
+
+## What the upgrade actually changed
+
+The commit that shipped zod 4.5.4 changed one assertion because of zod. A test in
+`apps/app/lib/action.test.ts` compared an error with zod's own French message, word for word:
+
+```ts
+fields: { name: ["Trop petit : chaîne doit avoir >=1 caractères"] },
+```
+
+zod 4.5.0 improved its French translation, and that sentence changed. The test now checks the
+start, which the app owns, rather than a sentence zod polishes between versions:
+
+```ts
+fields: { name: [expect.stringMatching(/^Trop petit/)] },
+```
+
+**radius did not connect this one.** The release notes do list it: "fix(locales): improve french
+translation". But the note says _french_, the code imports `fr` from `zod/locales`, and the test
+itself names nothing from zod: it compares a string. No name links the note to the line. That is the
+limit radius states on every run: behaviour changes are only seen through notes that name something
+you use. The test suite caught it, which is what tests are for.
+
+So the honest summary: radius turned 422 changes and 38 notes into one list to read, pointed at a real
+change in behaviour for users, and missed a test that depended on a translated sentence. It
+said review, not quiet.
+
+## Why not just read the changelog?
+
+I could have, for one package. Five releases of zod is a long read, most of it about APIs this app
+doesn't use. Reading works. It doesn't scale to the dozens of dependency pull requests a busy
+repository gets each week, and an AI agent pays for every changelog it reads in tokens.
+
+## How it works
+
+radius reads the project as it is: any package manager, no config, no install needed. It finds every
+name your code uses from a package, including through local re-export files like `lib/zod.ts`. Then
+two separate checks run:
+
+1. **The type surface.** Both versions' declaration files, compared export by export, matched
+   against the names you use.
+2. **The release notes.** Every version in between, from GitHub releases or the changelog, filtered
+   to entries that name something you use.
+
+The two are counted apart, never merged into one reassuring number. Anything radius cannot see, a
+package run from a script, a name passed around whole, types it cannot load, pushes the verdict
+towards review, never towards quiet.
+
+## Try it
+
+```sh
+npx dep-radius
+```
+
+In any JavaScript or TypeScript project. Free and MIT licensed. To replay an upgrade like this one,
+check out the commit before it and name the target: `npx dep-radius zod@4.5.4`. The
+[docs](/docs), the [GitHub Action](/docs/github-action) and the [guide for AI agents](/docs/agents)
+are on this site. The source is on [GitHub](https://github.com/prakticode/dep-radius).

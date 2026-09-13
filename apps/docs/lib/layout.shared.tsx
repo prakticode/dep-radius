@@ -25,6 +25,7 @@ export function homeLinks(): NonNullable<BaseLayoutProps["links"]> {
     { text: "Docs", url: "/docs", active: "nested-url" },
     { text: "For AI agents", url: "/docs/agents", active: "url" },
     { text: "GitHub Action", url: "/docs/github-action", active: "url" },
+    { text: "Blog", url: "/blog", active: "nested-url" },
     ...(baseOptions().links ?? []),
   ]
 }
