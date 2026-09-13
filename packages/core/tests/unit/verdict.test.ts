@@ -93,6 +93,18 @@ describe("decide", () => {
     ).toBe("review")
   })
 
+  it("reviews, with the reason, when the new types could not show a name you use", () => {
+    const detail =
+      "1 name you use may have moved to query-core, which 5.102.8 re-exports and radius does not follow"
+    const r = decide(
+      clean({
+        surface: { status: "computed", detail, touched: [], incomplete: true },
+      })
+    )
+    expect(r.verdict).toBe("review")
+    expect(r.reasons).toEqual([{ code: "surface-incomplete", detail }])
+  })
+
   it("reviews on notes, on breaking notes naming no API, and on blind spots", () => {
     const withNote = clean({
       notes: {

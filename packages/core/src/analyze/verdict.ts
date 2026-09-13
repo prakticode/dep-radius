@@ -12,7 +12,7 @@ export interface VerdictInput {
   zeroMajor: boolean
   flags: InstalledDep["flags"]
   usage: PackageUsage | undefined
-  surface: PackageBrief["surface"] & { truncatedOnUsedEntry?: boolean }
+  surface: PackageBrief["surface"] & { incomplete?: boolean }
   notes: PackageBrief["notes"]
 }
 
@@ -108,7 +108,7 @@ export function decide(input: VerdictInput): {
     surface.status === "failed" ||
     surface.status === "offline-uncached" ||
     surface.status === "types-elsewhere" ||
-    surface.truncatedOnUsedEntry
+    surface.incomplete
   ) {
     reasons.push({
       code: "surface-incomplete",

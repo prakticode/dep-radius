@@ -122,6 +122,19 @@ export function build(
     )
   const deprecatedOf = (s: ts.Symbol) =>
     !!s.declarations?.some((d) => ts.getJSDocDeprecatedTag(d))
+  // `class HttpResponse extends FetchResponse`, FetchResponse imported from a dependency: `any` here
+  const extendsUnresolved = (s: ts.Symbol) =>
+    !!s.declarations?.some(
+      (d) =>
+        (ts.isClassLike(d) || ts.isInterfaceDeclaration(d)) &&
+        !!d.heritageClauses?.some(
+          (h) =>
+            h.token === ts.SyntaxKind.ExtendsKeyword &&
+            h.types.some(
+              (t) => !!(checker.getTypeAtLocation(t).flags & ts.TypeFlags.Any)
+            )
+        )
+    )
   const emit = (sym: SurfaceSymbol) => {
     if (count >= SYMBOL_CAP) {
       flags.add("symbol-cap")
@@ -298,6 +311,11 @@ export function build(
       sig: [],
       deprecated: deprecatedOf(sym),
     }
+    if (
+      f & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface) &&
+      extendsUnresolved(sym)
+    )
+      record.unresolvedBase = true
     if (!emit(record)) return
     try {
       if (f & ts.SymbolFlags.Class) {
@@ -330,6 +348,10 @@ export function build(
             sym.declarations?.[0] as ts.TypeAliasDeclaration | undefined
           )?.typeParameters?.map((tp) => tp.name.text) ?? []
         record.sig = [typeText(checker, t, tps)]
+        // `type StrictResponse<T> = HttpResponse<T>`: the members are the class's, base and all
+        const target = t.getSymbol()
+        if (target && target !== sym && extendsUnresolved(target))
+          record.unresolvedBase = true
         if (t.flags & ts.TypeFlags.Object && !(t.flags & ts.TypeFlags.Union))
           walkMembers(path, t, "#", pkgName, entry, segs)
       } else if (f & ts.SymbolFlags.Enum) {
@@ -536,8 +558,10 @@ function unresolvedReexports(
 ): string[] {
   const out: string[] = []
   for (const stmt of sf.statements) {
+    // `export { a } from "x"` still names `a`; only `export * from "x"` hides what it brings
     if (
       !ts.isExportDeclaration(stmt) ||
+      stmt.exportClause ||
       !stmt.moduleSpecifier ||
       !ts.isStringLiteral(stmt.moduleSpecifier)
     )
