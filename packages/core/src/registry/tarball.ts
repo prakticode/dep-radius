@@ -16,6 +16,21 @@ export function isKeptFile(path: string): boolean {
   )
 }
 
+// The JavaScript a package runs, for the implementation facts. Source maps and declarations say
+// nothing about behaviour, and are left in the archive.
+export function isRuntimeFile(path: string): boolean {
+  return path === "package.json" || /\.[cm]?js$/.test(path)
+}
+
+// Which files of the archive a stage reads. Both come from the same cached bytes, so asking for the
+// runtime files never downloads a tarball twice.
+export type FileSet = "declarations" | "runtime"
+
+const KEEP: Record<FileSet, (path: string) => boolean> = {
+  declarations: isKeptFile,
+  runtime: isRuntimeFile,
+}
+
 export type TarballResult =
   | { ok: true; files: Map<string, Buffer>; integrity: string }
   | {
@@ -29,7 +44,8 @@ const memory = new Map<string, Promise<TarballResult>>()
 export function getTarballFiles(
   ctx: Ctx,
   cfg: RegistryConfig,
-  pv: PackumentVersion
+  pv: PackumentVersion,
+  set: FileSet = "declarations"
 ): Promise<TarballResult> {
   const integrity =
     pv.dist.integrity ??
@@ -37,10 +53,10 @@ export function getTarballFiles(
       ? `sha1-${Buffer.from(pv.dist.shasum, "hex").toString("base64")}`
       : "")
   const id = integrityHex(integrity) ?? sha1(pv.dist.tarball)
-  let p = memory.get(id)
+  let p = memory.get(`${id}:${set}`)
   if (!p) {
-    p = load(ctx, cfg, pv, integrity, id)
-    memory.set(id, p)
+    p = load(ctx, cfg, pv, integrity, id, KEEP[set])
+    memory.set(`${id}:${set}`, p)
   }
   return p
 }
@@ -50,7 +66,8 @@ async function load(
   cfg: RegistryConfig,
   pv: PackumentVersion,
   integrity: string,
-  id: string
+  id: string,
+  keep: (path: string) => boolean
 ): Promise<TarballResult> {
   const key = `tarballs/${id}.tgz`
   let bytes = await ctx.cache.getBytes(key)
@@ -76,7 +93,7 @@ async function load(
     }
   }
   try {
-    return { ok: true, files: readTarball(bytes, isKeptFile), integrity }
+    return { ok: true, files: readTarball(bytes, keep), integrity }
   } catch (error) {
     return {
       ok: false,
