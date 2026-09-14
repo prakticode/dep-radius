@@ -286,6 +286,8 @@ export interface ExtractOptions {
   // model calls not already on disk; entries past the budget get no record
   maxCalls: number
   concurrency?: number
+  // "same": both runs name the same subjects; "both": the subjects both runs name, when both are sure
+  agreement?: "same" | "both"
   log?: (line: string) => void
 }
 
@@ -363,17 +365,26 @@ export async function extractRecords(
             JSON.stringify(r.subjects) === JSON.stringify(runs[0]!.subjects)
         )
         const sure = runs.every((r) => !r.unsure)
+        const kept = !sure
+          ? []
+          : options.agreement === "both"
+            ? runs[0]!.subjects.filter((x) =>
+                runs.every((r) => r.subjects.includes(x))
+              )
+            : same
+              ? runs[0]!.subjects
+              : []
         const record: ChangeRecord = {
           schema: RECORD_SCHEMA,
           entry: entry.id,
           version: entry.version,
           kind: entry.kind,
           breaking: entry.breakingMarker,
-          subjects: same && sure ? runs[0]!.subjects : [],
+          subjects: kept,
           what: runs[0]!.what,
           source: "ai",
-          confidence: same && sure ? 1 : 0,
-          extractor: `ai:${model}:prompt-${PROMPT_VERSION}`,
+          confidence: same && sure ? 1 : kept.length > 0 ? 0.5 : 0,
+          extractor: `ai:${model}:prompt-${PROMPT_VERSION}${options.agreement === "both" ? ":both" : ""}`,
           provenance: {
             runs: runs.map((r) => ({ subjects: r.subjects, unsure: r.unsure })),
             candidates: candidates.length,
