@@ -13,6 +13,13 @@ import { listProjectFiles } from "./inventory/manifests.ts"
 import { DEFAULT_MIN_AGE_MS, type Options } from "./options.ts"
 import { isAgeExcluded, loadRegistryConfig } from "./registry/npmrc.ts"
 
+// The stages themselves, for tools that replay radius on many repositories (packages/corpus): the
+// packages a commit range upgraded, and the names the code uses, read the way `run()` reads them.
+export { scanUsage } from "./usage/scan.ts"
+export { buildInventory } from "./inventory/installed.ts"
+export { listProjectFiles } from "./inventory/manifests.ts"
+export { planSince, readBaseTree } from "./inventory/since.ts"
+
 // Each stage on its own, as JSON, for looking at one step without the rest of the pipeline.
 export async function runDebug(args: string[]): Promise<number> {
   const [cmd, ...rest] = args
