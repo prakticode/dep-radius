@@ -1,0 +1,11 @@
+{
+  "package": "zod",
+  "from": "4.4.3",
+  "to": "4.5.0",
+  "repository": "https://github.com/colinhacks/zod",
+  "sources": { "4.5.0": "https://github.com/colinhacks/zod/releases/tag/v4.5.0" },
+  "change": ["fix(locales): improve french translation"],
+  "why": "The French error messages changed wording, and a test comparing one word for word failed. The only mention is a commit title that names the locales subpath, not an API.",
+  "expect": ["src/lib/zod.ts:2", "src/lib/zod.ts:4", "src/lib/action.test.ts:8"],
+  "status": "missed"
+}

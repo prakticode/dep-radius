@@ -62,6 +62,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "backtest": "node scripts/backtest.ts",
+    "benchmark": "node scripts/benchmark.ts",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {

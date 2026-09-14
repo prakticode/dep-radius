@@ -77,7 +77,7 @@ export class FakeRegistry implements HttpClient {
     )
 
     const gh = p.repository
-      ? /github\.com\/([^/]+)\/([^/.]+)/.exec(p.repository)
+      ? /github\.com\/([^/]+)\/([\w.-]+?)(?:\.git)?$/.exec(p.repository)
       : null
     if (gh) {
       const releases = Object.entries(p.releases ?? {}).map(([tag, body]) => ({

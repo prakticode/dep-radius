@@ -1,0 +1,11 @@
+{
+  "package": "express",
+  "from": "4.21.2",
+  "to": "5.0.0",
+  "repository": "https://github.com/expressjs/express",
+  "sources": { "5.0.0": "https://github.com/expressjs/express/blob/master/History.md#500--2024-09-10" },
+  "change": ["res.redirect('back') and res.location('back') is no longer a supported magic string"],
+  "why": "After saving settings, the user is redirected to a relative path called back instead of the previous page.",
+  "expect": ["src/routes/settings.js:7"],
+  "status": "caught"
+}

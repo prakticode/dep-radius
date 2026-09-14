@@ -1,0 +1,11 @@
+{
+  "package": "zod",
+  "from": "4.4.3",
+  "to": "4.5.0",
+  "repository": "https://github.com/colinhacks/zod",
+  "sources": { "4.5.0": "https://github.com/colinhacks/zod/releases/tag/v4.5.0" },
+  "change": ["z.iso.datetime() requires seconds"],
+  "why": "A booking form sends minute-precision datetimes like 2026-01-01T06:15Z, which 4.5 rejects.",
+  "expect": ["src/bookings/schema.ts:5"],
+  "status": "caught"
+}
