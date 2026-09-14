@@ -184,6 +184,112 @@ describe("changes nothing ties to the code", () => {
   })
 })
 
+describe("entry kinds", () => {
+  const kinds = (markdown: string) =>
+    splitEntries("2.0.0", markdown).map((e) => [e.title, e.kind])
+
+  it("reads the sentences a release opens with as an intro, install command included", () => {
+    expect(
+      kinds(
+        [
+          "Lib 2.0 is now available.",
+          "",
+          "```sh",
+          "npm install lib@latest",
+          "```",
+          "",
+          "At a glance:",
+          "",
+          "- Remove glob support",
+          "- Add `watchFile()`",
+        ].join("\n")
+      )
+    ).toEqual([
+      ["Lib 2.0 is now available.", "intro"],
+      ["Remove glob support", "change"],
+      ["Add watchFile()", "addition"],
+    ])
+  })
+
+  it("never reads a release made of one paragraph as an intro", () => {
+    expect(kinds("Fixed the parser on empty input.")).toEqual([
+      ["Fixed the parser on empty input.", "change"],
+    ])
+  })
+
+  it("splits a labelled list into its items, and reads each item with its label", () => {
+    const e = splitEntries(
+      "5.0.0",
+      [
+        "* breaking:",
+        "  * `res.status()` accepts only integers",
+        "    * will throw a `RangeError` otherwise",
+        "* deps: send@1.0.0",
+        "* deps:",
+        "  - content-type@^2.0.0",
+        "- **types**:",
+        "  - Wire RouteNamedMap via generated routes.d.ts",
+      ].join("\n")
+    )
+    expect(e.map((x) => [x.title, x.kind, x.breakingMarker])).toEqual([
+      ["res.status() accepts only integers", "change", true],
+      ["deps: send@1.0.0", "housekeeping", false],
+      ["content-type@^2.0.0", "housekeeping", false],
+      ["Wire RouteNamedMap via generated routes.d.ts", "types", false],
+    ])
+    expect(e[0]!.regions.map((r) => r.text).join(" ")).toContain("RangeError")
+  })
+
+  it("reads work on the project itself, typings and pointers apart from changes", () => {
+    expect(
+      kinds(
+        [
+          "- 67e5478 #756 readme: added missing period",
+          "- **docs:** Broken anchors (#1979)",
+          "- Upgrade mocha version",
+          "- Apply small linter fixes in tests",
+          "- Special thanks to @someone for the help",
+          "- TypeScript: add missing definition for `withMetadata`",
+          "- improve typing for pipeline",
+          "- ➡️ check out the migration guide",
+          "- Fix migration CLI and cli tests",
+          "- Backport: ci: add node.js 24 to test matrix",
+        ].join("\n")
+      )
+    ).toEqual([
+      ["67e5478 #756 readme: added missing period", "housekeeping"],
+      ["**docs:** Broken anchors (#1979)", "housekeeping"],
+      ["Upgrade mocha version", "housekeeping"],
+      ["Apply small linter fixes in tests", "housekeeping"],
+      ["Special thanks to @someone for the help", "housekeeping"],
+      ["TypeScript: add missing definition for withMetadata", "types"],
+      ["improve typing for pipeline", "types"],
+      ["➡️ check out the migration guide", "reference"],
+      ["Fix migration CLI and cli tests", "change"],
+      ["Backport: ci: add node.js 24 to test matrix", "housekeeping"],
+    ])
+  })
+})
+
+describe("breaking sections", () => {
+  it("keeps a breaking section that only mentions APIs in its text as a break for anyone", () => {
+    const entries = splitEntries(
+      "8.0.0",
+      [
+        "## Breaking changes",
+        "",
+        "Option strict controls all strict mode restrictions.",
+        "Errors use `instancePath` instead of `dataPath`.",
+      ].join("\n")
+    )
+    expect(
+      matchNotes(entries, ["compile"], []).unattributedBreaking.map(
+        (e) => e.title
+      )
+    ).toEqual(["Breaking changes"])
+  })
+})
+
 describe("housekeeping", () => {
   it("reads project scopes, bracketed tags, thanks and bare links as housekeeping", () => {
     const e = splitEntries(

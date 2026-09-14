@@ -296,9 +296,21 @@ export interface NoteEntry {
   headingPath: string[]
   regions: { kind: RegionKind; text: string }[]
   breakingMarker: boolean
+  // housekeeping: never matched, never counted as a change
   noise: boolean
+  kind: EntryKind
   refs: string[]
 }
+
+// What an entry says about the package, whatever it names:
+// - change: behaviour may differ for existing code (the default)
+// - addition: something new that existing code doesn't use yet
+// - types: only the TypeScript declarations changed, which the type surface compares
+// - housekeeping: the project's own tests, docs, CI, dependencies, thanks
+// - intro: the sentence that opens a release before its list of changes
+// - reference: a pointer to a guide or a post, with nothing said in the entry itself
+export type EntryKind =
+  "change" | "addition" | "types" | "housekeeping" | "intro" | "reference"
 
 export interface NoteHit {
   name: string

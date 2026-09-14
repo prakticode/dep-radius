@@ -20,6 +20,7 @@ const entry = (title: string, breaking = false): NoteEntry => ({
   regions: [{ kind: "title", text: title }],
   breakingMarker: breaking,
   noise: false,
+  kind: "change",
   refs: [],
 })
 

@@ -61,6 +61,7 @@ const entry: NoteEntry = {
   regions: [],
   breakingMarker: true,
   noise: false,
+  kind: "change",
   refs: [],
 }
 

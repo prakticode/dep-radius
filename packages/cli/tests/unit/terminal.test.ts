@@ -174,6 +174,7 @@ describe("renderTerminal", () => {
               regions: [],
               breakingMarker: true,
               noise: false,
+              kind: "change",
               refs: [],
             },
             hits: [{ name: "max", strength: "strong", region: "inline-code" }],

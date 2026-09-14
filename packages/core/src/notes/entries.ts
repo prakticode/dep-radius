@@ -1,5 +1,5 @@
 import { sha1 } from "../infra/hash.ts"
-import type { NoteEntry, RegionKind } from "../model.ts"
+import type { EntryKind, NoteEntry, RegionKind } from "../model.ts"
 
 // A heading says a whole section breaks; a title has to lead with it, emphasised or not ("*Breaking*:",
 // "__Breaking:__"). "non-breaking" and a bullet that merely mentions breaking somewhere in its prose
@@ -10,10 +10,25 @@ const BREAKING_TITLE =
 const NOISE =
   /^(ci|chore|test|tests|docs|doc|build|style|refactor|perf\(bench\)|release|revert)(\([^)]*\))?!?:|^(deps?|dependencies)(\([^)]*\))?:|^bump\s+\S+\s+from\s|^merge (pull request|branch)|^update dependency\b|^v?\d+\.\d+\.\d+$/i
 // Housekeeping written other ways: a conventional scope that is about the project, not the package
-// (`fix(types):`, `fix(docs):`), a bracketed tag (`[meta]`, `[Dev Deps]`), dependency updates,
-// thanks, and the lines release tools add around the notes.
+// (`fix(types):`, `fix(docs):`, `readme:`), a bracketed tag (`[meta]`, `[Dev Deps]`), dependency
+// updates, thanks, and the lines release tools add around the notes.
 const HOUSEKEEPING =
-  /^\w+\((types?|typings?|typescript|docs?|readme|ci|tests?|deps?|deps-dev|build|release|lint|examples?|website)\)!?:|^\[(meta|actions|dev deps|deps|tests?|docs?|readme|ci|refactor|robustness)\]|^updated? dependencies\b|^thanks\b|^full changelog\b|^no significant changes\b|^new contributors?\b/i
+  /^\w+\((types?|typings?|typescript|docs?|readme|ci|tests?|deps?|deps-dev|build|release|lint|examples?|website)\)!?:|^(readme|internal|release|examples?|website)\s*:|^\[(meta|actions|dev deps|deps|tests?|docs?|readme|ci|refactor|robustness)\]|^updated? dependencies\b|^(special )?thanks\b|^kudos\b|^full changelog\b|^no significant changes\b|^new contributors?\b|^(commits|contributors)$|^(upgrade|update|bump)\b.*\b(dev-?dependenc\w*|version)\b|^(upgrade|update|bump)\s+\S+\s+(from|to)\s+v?[\^~]?\d/i
+// Work on the project itself, said in words: its tests, linting, spelling, CI, package manager, docs.
+const PROJECT_WORK =
+  /\b(linter|lint fixes|spelling|typos?|test suite|tests? for|in tests|ci\b|dtslint|package manager|readme|documentation|jsdoc)\b/i
+// Only the declarations changed: the type surface compares those, the notes add nothing.
+const TYPES_ONLY =
+  /^(typescript|types?|typings?)\s*:|^(improve|update|fix)\s+(the\s+)?(typing|typings|types|type definitions?)\b|\bindex\.d\.ts\b/i
+// What adds without changing what exists: a feature, a new option, a speed-up.
+const ADDITION_TITLE =
+  /^(feat|feature|perf)(\([^)]*\))?!?:|^(add|adds|added|new|support|supports|introduce|introduces|expose|exposes|allow|allows)\b/i
+const ADDITION_HEADING = /feature|added|\bnew\b|performance|\bperf\b/i
+// "npm install zod@latest" under a release's opening sentence: how to get it, not what changed.
+const INSTALL_COMMAND = /^\s*(npm|pnpm|yarn|bun|npx)\s+(install|add|i)\b/m
+// A pointer elsewhere, with nothing said in the entry itself.
+const REFERENCE =
+  /\b(migration guide|upgrade guide|blog post|announcement|release notes|changelog)\b/i
 
 interface Draft {
   title: string
@@ -105,8 +120,15 @@ export function splitEntries(version: string, markdown: string): NoteEntry[] {
   }
   close()
 
-  const kept = drafts.filter(
+  const kept = expandSections(drafts).filter(
     (d) => d.title || d.lines.some((l) => l.text.trim())
+  )
+  // the paragraphs a release opens with, before its first heading or list
+  const firstListed = kept.findIndex((d) => d.kind !== "paragraph")
+  const intros = new Set(
+    firstListed > 0 && kept.length - firstListed >= 2
+      ? kept.slice(0, firstListed)
+      : []
   )
   // an "at a glance" bullet that restates a section of the same release: the section is the entry
   const headingTitles = kept
@@ -120,8 +142,38 @@ export function splitEntries(version: string, markdown: string): NoteEntry[] {
           (h) => h.length >= 3 && startsWithTitle(normTitle(d.title), h)
         )
     )
-    .map((d, index) => toEntry(version, d, index))
+    .map((d, index) => toEntry(version, d, index, intros.has(d)))
   return dedupeByRefs(entries)
+}
+
+// "breaking:", "**resolve**:" with the changes listed under it: each nested item is the entry, and
+// the label becomes part of where it sits, so a breaking label still marks its items.
+function expandSections(drafts: Draft[]): Draft[] {
+  const out: Draft[] = []
+  for (const d of drafts) {
+    const nested = d.lines.filter((l) => !l.code && /^\s+[-*+]\s+/.test(l.text))
+    if (d.kind !== "bullet" || !/:\s*$/.test(d.title) || nested.length === 0) {
+      out.push(d)
+      continue
+    }
+    const indentOf = (text: string) => text.length - text.trimStart().length
+    const top = Math.min(...nested.map((l) => indentOf(l.text)))
+    const label = d.title.replace(/:\s*$/, "").trim()
+    const children: Draft[] = []
+    const intro: Draft["lines"] = []
+    for (const l of d.lines) {
+      const item = /^(\s+)[-*+]\s+(.*)$/.exec(l.text)
+      if (!l.code && item && indentOf(l.text) === top)
+        children.push(
+          newDraft("bullet", clean(item[2] ?? ""), [...d.headingPath, label])
+        )
+      else if (children.length > 0) children.at(-1)!.lines.push(l)
+      else intro.push(l)
+    }
+    if (intro.some((l) => l.text.trim())) out.push({ ...d, lines: intro })
+    out.push(...children)
+  }
+  return out
 }
 
 function normTitle(s: string): string {
@@ -148,7 +200,12 @@ function newDraft(
   return { kind, title, headingPath, lines: [] }
 }
 
-function toEntry(version: string, d: Draft, index: number): NoteEntry {
+function toEntry(
+  version: string,
+  d: Draft,
+  index: number,
+  intro: boolean
+): NoteEntry {
   const regions: NoteEntry["regions"] = []
   const pushText = (
     text: string,
@@ -183,11 +240,8 @@ function toEntry(version: string, d: Draft, index: number): NoteEntry {
       [...all.matchAll(/(?<![\w/])#(\d{1,7})\b/g)].map((m) => `#${m[1]}`)
     ),
   ]
-  const bareTitle = d.title
-    .replace(/`/g, "")
-    .replace(/^[0-9a-f]{7,40}\s+/, "")
-    .replace(/^\*\*[^*]+\*\*:?\s*/, "")
   const titleForDisplay = d.title.replace(/`/g, "")
+  const kind = kindOf(d, regions, all, intro)
   return {
     id: sha1(`${version}\0${index}\0${all}`).slice(0, 12),
     version,
@@ -200,15 +254,57 @@ function toEntry(version: string, d: Draft, index: number): NoteEntry {
     breakingMarker:
       BREAKING_TITLE.test(d.title) ||
       d.headingPath.some((h) => BREAKING_HEADING.test(h)),
-    noise:
-      NOISE.test(bareTitle.trim()) ||
-      HOUSEKEEPING.test(bareTitle.trim()) ||
-      contentless(all, regions) ||
-      d.headingPath.some((h) =>
-        /^(commits|contributors|new contributors)$/i.test(h.trim())
-      ),
+    noise: kind === "housekeeping",
+    kind,
     refs,
   }
+}
+
+// The title as a commit tool writes it, without what surrounds the words: a hash, pull request
+// numbers, backticks, and a bold scope kept as a scope (`**docs:** fix` reads `docs: fix`).
+function bareTitleOf(title: string): string {
+  return title
+    .replace(/`/g, "")
+    .replace(/^[0-9a-f]{7,40}\s+/, "")
+    .replace(/^(?:#\d+\s+)+/, "")
+    .replace(/^\*\*([^*]+?):?\*\*:?\s*/, "$1: ")
+    .replace(/^backport:\s*/i, "")
+    .trim()
+}
+
+function kindOf(
+  d: Draft,
+  regions: NoteEntry["regions"],
+  all: string,
+  intro: boolean
+): EntryKind {
+  const bare = bareTitleOf(d.title)
+  // an item listed under a label reads with it: "deps: content-type@^2.0.0", "types: ..."
+  const label = d.headingPath.at(-1)
+  const labelled = label ? `${bareTitleOf(label)}: ${bare}` : bare
+  const namesCode = regions.some(
+    (r) =>
+      r.kind === "inline-code" ||
+      (r.kind === "code-block" && !INSTALL_COMMAND.test(r.text))
+  )
+  if (
+    [bare, labelled].some((t) => NOISE.test(t) || HOUSEKEEPING.test(t)) ||
+    contentless(all, regions) ||
+    d.headingPath.some((h) =>
+      /^(commits|contributors|new contributors)$/i.test(h.trim())
+    ) ||
+    (!namesCode && PROJECT_WORK.test(bare))
+  )
+    return "housekeeping"
+  if (TYPES_ONLY.test(bare) || TYPES_ONLY.test(labelled)) return "types"
+  if (intro && !namesCode) return "intro"
+  if (!namesCode && all.length < 160 && REFERENCE.test(all)) return "reference"
+  if (
+    ADDITION_TITLE.test(bare) ||
+    d.headingPath.some((h) => ADDITION_HEADING.test(h))
+  )
+    return "addition"
+  return "change"
 }
 
 // "npm", "[#430]: #430": a link label or a reference with nothing said around it.
@@ -266,9 +362,10 @@ function preprocess(md: string): string {
       .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
       .replace(/<img\b[^>]*>/gi, "")
       .replace(
-        /<\/?(details|summary|p|div|br|sup|sub|b|i|em|strong|span|a)\b[^>]*>/gi,
+        /<\/?(details|summary|p|div|br|sup|sub|b|i|em|strong|span|a|samp)\b[^>]*>/gi,
         " "
       )
+      .replace(/&nbsp;/g, " ")
   )
 }
 
