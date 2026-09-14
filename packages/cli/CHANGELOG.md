@@ -1,5 +1,17 @@
 # dep-radius
 
+## 0.4.3
+
+### Patch Changes
+
+- 60aadbd: A release note radius cannot tie to your code by name can now show where it probably
+  lands: when the note names a function inside the package that changed under an export you use,
+  such as `setItem` called by `persist`, the brief adds "probably reaches" with your sites, and
+  `--json` adds `likely` to the entry. It is a hint only: verdicts do not change, and it is left out
+  when most of the package's code changed.
+- Updated dependencies [60aadbd]
+  - @dep-radius/core@0.4.3
+
 ## 0.4.2
 
 ### Patch Changes
