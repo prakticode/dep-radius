@@ -68,7 +68,7 @@ const results: CaseResult[] = []
 for (const c of loadCases()) {
   assertWellFormed(c)
   const runtime = values.runtime ? await runtimeOf(c) : undefined
-  results.push(await runCase(c, undefined, runtime))
+  results.push(await runCase(c, undefined, runtime ? { runtime } : {}))
 }
 const sum = totals(results)
 const seconds = (Date.now() - started) / 1000
