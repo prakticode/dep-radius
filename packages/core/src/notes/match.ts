@@ -20,12 +20,25 @@ function patternFor(name: string): RegExp {
   )
 }
 
-// A breaking entry that names an API is about that API; when it is not one of yours, it is someone
-// else's break. One that names nothing ("drops Node 18", "ESM only") can be anyone's.
+// A change that names an API somewhere is about that API; when it is not one of yours, it is
+// someone else's.
 function namesAnApi(e: NoteEntry): boolean {
   const headline = e.regions.filter(
     (r) => r.kind === "title" || r.kind === "inline-code"
   )
+  return headline.some(
+    (r) => r.kind === "inline-code" || /[\w$]\(\)|\.[a-z]\w*\(/i.test(r.text)
+  )
+}
+
+// A breaking entry is someone else's break only when its headline names the API. A breaking section
+// that mentions a few APIs in its text can describe other breaks too ("Option strict controls all
+// strict mode restrictions"), so it stays a break that could apply to anyone.
+function headlineNamesAnApi(e: NoteEntry): boolean {
+  const end = e.regions.findIndex(
+    (r) => r.kind === "prose" || r.kind === "code-block"
+  )
+  const headline = end < 0 ? e.regions : e.regions.slice(0, end)
   return headline.some(
     (r) => r.kind === "inline-code" || /[\w$]\(\)|\.[a-z]\w*\(/i.test(r.text)
   )
@@ -50,22 +63,6 @@ export interface MatchOptions {
   // the package's types were read, so a note naming an API radius does not see you use is about
   // someone else's API; without them, it may be an option or a member the scan cannot tell apart
   typesRead?: boolean
-}
-
-// What adds without changing what exists: a feature, a new option, a speed-up.
-const ADDITION_TITLE =
-  /^(feat|feature|perf)(\([^)]*\))?!?:|^(add|adds|added|new|support|supports|introduce|introduces|expose|exposes|allow|allows)\b/i
-const ADDITION_HEADING = /feature|added|\bnew\b|performance|\bperf\b/i
-
-function isAddition(e: NoteEntry): boolean {
-  const title = e.title
-    .replace(/^[0-9a-f]{7,40}\s+/, "")
-    .replace(/^(?:#\d+\s+)+/, "")
-    .replace(/^\*\*[^*]+\*\*:?\s*/, "")
-  return (
-    ADDITION_TITLE.test(title) ||
-    e.headingPath.some((h) => ADDITION_HEADING.test(h))
-  )
 }
 
 // An option is named in a note's words or code spans, never in its examples: as a code-shaped
@@ -184,8 +181,9 @@ export function matchNotes(
           (h) => h.strength === "strong" && h.region !== "code-block"
         ),
       })
-    else if (e.breakingMarker && !namesAnApi(e)) unattributedBreaking.push(e)
-    else if (!isAddition(e) && (!namesAnApi(e) || !typesRead))
+    else if (e.breakingMarker && !headlineNamesAnApi(e))
+      unattributedBreaking.push(e)
+    else if (e.kind === "change" && (!namesAnApi(e) || !typesRead))
       unattributedChanges.push(e)
   }
   matched.sort(
