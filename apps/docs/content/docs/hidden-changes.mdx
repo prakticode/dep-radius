@@ -1,0 +1,69 @@
+---
+title: Does this pull request change more than it says?
+description: A bot pull request can change other packages than the one in its title. radius lists every version that changed.
+icon: ScanEye
+---
+
+## The situation
+
+Dependabot opens a pull request: "Bump qs from 6.13.0 to 6.14.0". You read the title, CI is green,
+you merge.
+
+But to install the new `qs`, the lockfile also moved `express` from 4 to 5, a major version with
+breaking changes. The title doesn't say it. The description doesn't either.
+
+This really happens. See
+[dependabot-core#16225](https://github.com/dependabot/dependabot-core/issues/16225), where a security
+update for `qs` silently upgraded `express` from 4 to 5.
+
+## What radius does
+
+radius doesn't read the pull request title. It compares the lockfile of the pull request with the
+lockfile of the base branch, for every dependency in your `package.json`. So it lists **every**
+version that changed, including the ones nobody mentioned.
+
+On the example above, real output, shortened:
+
+```txt
+express  4.21.2 → 5.0.0  major   REVIEW
+  5.0.0  breaking:  possibly
+    you use: redirect
+    src/app.js:8
+  ...
+
+qs  6.13.0 → 6.14.0  minor   REVIEW
+  ...
+
+2 changed  0 quiet · 2 review · 0 blocked  · 0 unchanged
+```
+
+The pull request was about `qs`. radius also shows `express 4.21.2 → 5.0.0`, and the line that uses
+something Express 5 changed.
+
+## On every pull request
+
+Set up the [GitHub Action](/docs/github-action). It runs this comparison on each pull request that
+changes a dependency, and comments with every changed version.
+
+Note: GitHub gives Dependabot pull requests a read-only token, so the comment can't be posted there.
+The same result is in the job summary of the workflow run.
+
+## On one pull request, by hand
+
+```sh
+git fetch origin pull/123/head:pr-123
+git checkout pr-123
+npx dep-radius --since "$(git merge-base origin/main HEAD)"
+```
+
+`git merge-base` finds the commit the pull request started from. Comparing with `origin/main`
+directly would also include what changed on `main` since then.
+
+## Good to know
+
+- **Only direct dependencies are compared**: the ones in a `package.json`. If a pull request changes
+  only a dependency of a dependency, radius doesn't list it.
+- **A version can change while `package.json` doesn't.** The lockfile decides what gets installed, so
+  that's what radius reads.
+- **An added dependency** is listed under "not analysed", because there is no earlier version to
+  compare with.
