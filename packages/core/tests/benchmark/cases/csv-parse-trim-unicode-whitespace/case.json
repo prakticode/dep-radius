@@ -1,0 +1,17 @@
+{
+  "package": "csv-parse",
+  "from": "6.2.1",
+  "to": "7.0.0",
+  "repository": "https://github.com/adaltas/node-csv",
+  "sources": {
+    "7.0.0": "https://github.com/adaltas/node-csv/blob/master/packages/csv-parse/CHANGELOG.md"
+  },
+  "change": [
+    "align trim with ECMAScript whitespace"
+  ],
+  "why": "With trim, a leading no-break or full-width space is now stripped from fields, and a no-break space before a quoted field no longer throws INVALID_OPENING_QUOTE, so imported values and rejected rows differ from before.",
+  "expect": [
+    "src/import/customers.js:4"
+  ],
+  "status": "missed"
+}

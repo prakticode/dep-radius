@@ -1,0 +1,19 @@
+{
+  "package": "multer",
+  "from": "2.3.0",
+  "to": "2.4.0",
+  "repository": "https://github.com/expressjs/multer",
+  "sources": {
+    "2.4.0": "https://github.com/expressjs/multer/blob/main/CHANGELOG.md#240"
+  },
+  "change": [
+    "Reject non-integer or negative limits values at construction time",
+    "a float limit silently disabled the check"
+  ],
+  "why": "multer() now throws a TypeError at startup because 0.2 * 1024 * 1024 is not an integer, so the server no longer boots. Before, the float limit was never enforced and large avatars were silently truncated and saved.",
+  "expect": [
+    "src/routes/avatar.js:4",
+    "src/routes/avatar.js:6"
+  ],
+  "status": "caught"
+}

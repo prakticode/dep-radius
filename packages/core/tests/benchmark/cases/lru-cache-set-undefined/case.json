@@ -1,0 +1,18 @@
+{
+  "package": "lru-cache",
+  "from": "9.0.3",
+  "to": "9.1.0",
+  "repository": "https://github.com/isaacs/node-lru-cache",
+  "sources": {
+    "9.1.0": "https://github.com/isaacs/node-lru-cache/blob/main/CHANGELOG.md#91"
+  },
+  "change": [
+    "cache.set(key, undefined) is now an alias for cache.delete(key)"
+  ],
+  "why": "Storing an unknown email as undefined now deletes the entry instead of caching the miss, so has() stays false and every lookup of an unknown email queries the database again.",
+  "expect": [
+    "src/users/lookup.js:7",
+    "src/users/lookup.js:11"
+  ],
+  "status": "caught"
+}

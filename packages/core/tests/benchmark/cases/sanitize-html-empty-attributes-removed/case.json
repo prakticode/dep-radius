@@ -1,0 +1,17 @@
+{
+  "package": "sanitize-html",
+  "from": "2.10.0",
+  "to": "2.11.0",
+  "repository": "https://github.com/apostrophecms/sanitize-html",
+  "sources": {
+    "2.11.0": "https://github.com/apostrophecms/sanitize-html/blob/main/CHANGELOG.md"
+  },
+  "change": [
+    "Remove empty non-boolean attributes"
+  ],
+  "why": "Empty attributes such as alt=\"\" on decorative images and href=\"\" on links are now stripped, so screen readers announce the image file name and the link is no longer a link.",
+  "expect": [
+    "src/comments/renderComment.js:4"
+  ],
+  "status": "missed"
+}
