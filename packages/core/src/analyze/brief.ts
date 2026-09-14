@@ -33,6 +33,7 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
         total: 0,
         matched: [],
         unattributedBreaking: [],
+        unattributedChanges: [],
       }
     : {
         coverage: parts.notes?.coverage ?? "unavailable",
@@ -40,6 +41,7 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
         total: parts.match?.total ?? 0,
         matched: parts.match?.matched ?? [],
         unattributedBreaking: parts.match?.unattributedBreaking ?? [],
+        unattributedChanges: parts.match?.unattributedChanges ?? [],
       }
   const from = semver.parse(candidate.from)
   const to = semver.parse(candidate.to)

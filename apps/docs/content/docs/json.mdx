@@ -82,6 +82,7 @@ Each entry of `touched`:
 | `versions`            | Per version: `status`, the `source` (`kind` and `url`), or a `reason`         |
 | `matched`             | Entries that name something you use: `version`, `title`, `breaking`, `direct`, `refs`, and `names` (`name`, `certainty`, `where`, and `option: true` when the name is an option a function you call accepts) |
 | `breakingWithoutApi`  | Breaking entries that name no API, so they could apply to anyone              |
+| `changesWithoutApi`   | Other changes radius can't tie to your code: they name no API, or name one it can't place without types |
 
 ### `usage`
 
@@ -113,6 +114,7 @@ Each entry of `touched`:
 | `possibly-touched`        | review    | A member you may reach by name changed                           |
 | `notes-match`             | review    | A release note names something you use                           |
 | `unattributed-breaking`   | review    | A breaking note names no API, so it could be about you           |
+| `unattributed-change`     | review    | A note describes a change radius can't tie to your code          |
 | `blind-spots`             | review    | Part of your usage isn't visible                                 |
 | `opaque-usage`            | review    | Used from scripts, config, CSS or side effects                   |
 | `not-referenced`          | review    | No scanned file uses it: a tool, loaded by name, or unused       |

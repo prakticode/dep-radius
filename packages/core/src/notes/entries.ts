@@ -9,6 +9,11 @@ const BREAKING_TITLE =
   /^\s*(\*{1,2}|_{1,2}|\[|\()?\s*(⚠️|:warning:|breaking|💥|:boom:)|BREAKING CHANGE/i
 const NOISE =
   /^(ci|chore|test|tests|docs|doc|build|style|refactor|perf\(bench\)|release|revert)(\([^)]*\))?!?:|^(deps?|dependencies)(\([^)]*\))?:|^bump\s+\S+\s+from\s|^merge (pull request|branch)|^update dependency\b|^v?\d+\.\d+\.\d+$/i
+// Housekeeping written other ways: a conventional scope that is about the project, not the package
+// (`fix(types):`, `fix(docs):`), a bracketed tag (`[meta]`, `[Dev Deps]`), dependency updates,
+// thanks, and the lines release tools add around the notes.
+const HOUSEKEEPING =
+  /^\w+\((types?|typings?|typescript|docs?|readme|ci|tests?|deps?|deps-dev|build|release|lint|examples?|website)\)!?:|^\[(meta|actions|dev deps|deps|tests?|docs?|readme|ci|refactor|robustness)\]|^updated? dependencies\b|^thanks\b|^full changelog\b|^no significant changes\b|^new contributors?\b/i
 
 interface Draft {
   title: string
@@ -197,11 +202,24 @@ function toEntry(version: string, d: Draft, index: number): NoteEntry {
       d.headingPath.some((h) => BREAKING_HEADING.test(h)),
     noise:
       NOISE.test(bareTitle.trim()) ||
+      HOUSEKEEPING.test(bareTitle.trim()) ||
+      contentless(all, regions) ||
       d.headingPath.some((h) =>
         /^(commits|contributors|new contributors)$/i.test(h.trim())
       ),
     refs,
   }
+}
+
+// "npm", "[#430]: #430": a link label or a reference with nothing said around it.
+function contentless(all: string, regions: NoteEntry["regions"]): boolean {
+  if (regions.some((r) => r.kind === "inline-code" || r.kind === "code-block"))
+    return false
+  const words = all
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/(?<![\w/])#\d+\b|\b[0-9a-f]{7,40}\b/g, "")
+    .match(/[A-Za-z]{2,}/g)
+  return (words?.length ?? 0) < 2
 }
 
 // The "Commits" list of a release repeats the pull requests the sections already describe.

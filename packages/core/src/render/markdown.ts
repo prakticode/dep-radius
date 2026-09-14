@@ -65,6 +65,7 @@ function section(p: PackageBrief, now: number): string[] {
     `Published ${ago(p.publishedAt, now)} · ${coverageLabel(p)} · used in ${p.usage.files} files`
   )
   lines.push("")
+  let unplaced = 0
   for (const f of orderFindings(p)) {
     if (f.kind === "type") {
       const t = f.touched
@@ -86,16 +87,27 @@ function section(p: PackageBrief, now: number): string[] {
         m.direct ? 3 : 1
       ))
         lines.push(`  - \`${siteLabel(s)}\``)
-    } else {
+    } else if (f.kind === "breaking-no-api") {
       lines.push(
         `- ${f.entry.version}: ${f.entry.title} _(breaking, names no API)_`
       )
+    } else if (++unplaced <= UNPLACED_CAP) {
+      lines.push(
+        `- ${f.entry.version}: ${f.entry.title} _(a change radius cannot tie to your code)_`
+      )
     }
   }
+  if (unplaced > UNPLACED_CAP)
+    lines.push(
+      `- and ${unplaced - UNPLACED_CAP} more ${unplaced - UNPLACED_CAP === 1 ? "change" : "changes"} radius cannot tie to your code`
+    )
   lines.push("")
   lines.push(`<sub>${p.reasons.map((r) => r.detail).join(" · ")}</sub>`)
   return lines
 }
+
+// changes nothing ties to the code: a release has many, a comment shows the first few
+const UNPLACED_CAP = 5
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)

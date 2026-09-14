@@ -197,7 +197,10 @@ export async function run(
           notes.entries,
           usage?.strongNames ?? [],
           usage?.weakNames ?? [],
-          { accepted: Object.keys(optionSites) }
+          {
+            accepted: Object.keys(optionSites),
+            typesRead: surface.status === "computed",
+          }
         )
       : undefined
     const merged =

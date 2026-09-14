@@ -17,36 +17,44 @@ notes that name something the project uses without being the change this case is
 
 The number that matters most is lower. The benchmark was built in three rounds:
 
-| Round                                                              | Cases | Caught | Called quiet |
-| ------------------------------------------------------------------ | ----- | ------ | ------------ |
-| The first 14, written while radius was being built                 | 14    | 12     | 0            |
-| 25 more, each fixed before radius had ever run on them              | 25    | 10     | 5            |
-| 12 more, added after the fixes below, also fixed before radius ran  | 12    | 2      | 8            |
+| Round                                                              | Cases | Caught |
+| ------------------------------------------------------------------ | ----- | ------ |
+| The first 14, written while radius was being built                 | 14    | 12     |
+| 25 more, each fixed before radius had ever run on them              | 25    | 10     |
+| 12 more, added after the fixes below, also fixed before radius ran  | 12    | 2      |
 
 The first round was written by people who knew how radius matches notes, and it shows. The second
 and third rounds are the honest estimate: **12 of 37 documented behaviour changes reach the right
-line (about one in three), and 13 of 37 are called quiet.**
+line (about one in three).**
 
 The third round was added to check the fixes made after the second: they caught 4 more cases there,
 and 2 of the 12 new ones. Each fix was real, and narrow.
 
-**13 of the 27 misses are called quiet.** The upgrade changes behaviour the project relies on, the
-notes say so, and radius would let it through unread. That is the failure radius is built to avoid,
-and this benchmark is where it shows. The earlier [backtest](/docs/verdicts#why-quiet-is-hard-to-earn)
-found none because it only sees breaks that forced a code change.
+**None of the 51 upgrades is called quiet.** Until the latest version, 13 of the misses were: the
+upgrade changed behaviour the project relies on, the notes said so, and radius let it through
+unread, because no note named anything it could tie to the code. The earlier
+[backtest](/docs/verdicts#why-quiet-is-hard-to-earn) found none of those because it only sees breaks
+that forced a code change.
+
+radius now refuses quiet while a release note describes a change it can't tie to your code, and
+lists that note instead. The cost is real: on 451 past upgrades of three open source projects
+(umami, uptime-kuma and outline), quiet went from 180 (40%) to 43 (10%). A quiet verdict is rare
+now, and when radius gives one, it can say why.
 
 ## Progress
 
 On the first 39 cases:
 
-| Version of radius                    | Caught   | Called quiet |
-| ------------------------------------ | -------- | ------------ |
-| When this page was first published   | 18 of 39 | 8            |
-| Now                                  | 22 of 39 | 5            |
+| Version of radius                                  | Caught   | Called quiet |
+| -------------------------------------------------- | -------- | ------------ |
+| When this page was first published                 | 18 of 39 | 8            |
+| After the matching fixes                           | 22 of 39 | 5            |
+| Now: every change note must be accounted for       | 22 of 39 | 0            |
 
-What changed: without types, the keys a project passes to a call (`bodyParser.json({ limit })`)
+The matching fixes: without types, the keys a project passes to a call (`bodyParser.json({ limit })`)
 count as that call's options; a code span naming a nested option (`retry.methods`) matches the
-option; and a commit title that starts with an API (`diff: fix ...`) names it.
+option; and a commit title that starts with an API (`diff: fix ...`) names it. On the 12 cases added
+after them, they caught 2, and 8 were called quiet until the last change.
 
 ## What a case is
 
@@ -107,8 +115,7 @@ name links the two. They fall into four groups.
 ### The note describes the change in words
 
 The note never names an API the code uses. Reading names can't connect it. This is the largest group,
-and the one name matching can't close. Called quiet: `csv-parse`, `knex`, `papaparse`,
-`sanitize-html`, `vue-router` and `yup`.
+and the one name matching can't close.
 
 | Package      | Upgrade          | The note says                                              |
 | ------------ | ---------------- | ---------------------------------------------------------- |
@@ -131,8 +138,6 @@ The note names an option, but radius can't tie it to the code's call: the types 
 in another package or in `@types`, the note writes it as plain words or a link, or the function comes
 from destructuring, or the option belongs to a constructor.
 
-Called quiet: `@tanstack/react-query`, `ajv`, `fast-xml-parser` and `qs`.
-
 | Package                 | Upgrade              | The option                                     |
 | ----------------------- | -------------------- | ---------------------------------------------- |
 | `@tanstack/react-query` | 5.100.13 → 5.100.14  | "not subscribed", in words, declared in `query-core` |
@@ -146,8 +151,7 @@ Called quiet: `@tanstack/react-query`, `ajv`, `fast-xml-parser` and `qs`.
 
 ### The name is written as code, and not matched
 
-The note names what the code uses in a form radius doesn't read yet, or names its neighbour. Called
-quiet: `rxjs` and `zustand`.
+The note names what the code uses in a form radius doesn't read yet, or names its neighbour.
 
 | Package       | Upgrade          | How the note names it                                   |
 | ------------- | ---------------- | ------------------------------------------------------- |
@@ -158,7 +162,6 @@ quiet: `rxjs` and `zustand`.
 ### The name belongs to something else
 
 The note names an object radius doesn't attribute to the package, or a value that lives in a string.
-Called quiet: `tailwind-merge`.
 
 | Package          | Upgrade          | The name                                                |
 | ---------------- | ---------------- | ------------------------------------------------------- |
@@ -174,9 +177,10 @@ Called quiet: `tailwind-merge`.
   upgrades.
 - **The projects are small.** A real project uses a package in more places, which can make a name
   match easier, and more notes match by accident.
-- **A miss is not always a review.** 14 of the 27 missed upgrades still go to review, because they
-  are majors, or other notes and blind spots send them there; what they lose is the pointer to the
-  right line. The other 13 are called quiet, and a quiet verdict on them is wrong.
+- **A miss is still a review.** Every missed upgrade goes to review. In 23 of the 27, the note that
+  describes the change is shown among the notes radius can't tie to the code, or among breaking notes
+  naming no API; in the other 4, other notes send it to review. What a miss loses is the pointer to
+  the right line.
 - **Undocumented changes are out of scope.** A change nobody wrote down is invisible to any tool that
   reads notes. Your tests remain the net for those.
 
