@@ -1,0 +1,33 @@
+{
+  "name": "@dep-radius/corpus",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Collects real upgrade cases from GitHub, bot pull requests a person had to fix, and measures radius on them. Never published.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "corpus": "node src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0",
+    "lint:fix": "eslint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf .turbo"
+  },
+  "dependencies": {
+    "@dep-radius/core": "workspace:*",
+    "semver": "^7.8.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@types/semver": "^7.7.0",
+    "eslint": "^9.39.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.0"
+  }
+}
