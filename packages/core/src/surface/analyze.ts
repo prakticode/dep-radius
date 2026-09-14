@@ -125,8 +125,8 @@ export async function analyzeSurface(
     }
   }
 
-  // `export * from "other-lib"`: the names live in another package's types, which radius does not
-  // follow. The notes are the only net here, said as such rather than as a hundred blind spots.
+  // `export * from "other-lib"`: the names live in another package's types, which radius could not
+  // load. The notes are the only net here, said as such rather than as a hundred blind spots.
   const elsewhere = [
     ...new Set(
       [...missingEntries].flatMap(

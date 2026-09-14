@@ -5,7 +5,12 @@ import { run } from "../../src/run.ts"
 import { splitEntries } from "../../src/notes/entries.ts"
 import type { NoteEntry, PackageBrief } from "../../src/model.ts"
 import { createProject, pkgJson } from "../helpers/tmp-project.ts"
-import { FakeRegistry, testCtx, testOptions } from "../helpers/fake-registry.ts"
+import {
+  type FakePackage,
+  FakeRegistry,
+  testCtx,
+  testOptions,
+} from "../helpers/fake-registry.ts"
 
 // A documented behaviour change from a real release, and the lines of a project it lands on. The
 // notes are copied verbatim from the release; the project is small and uses the package the way
@@ -108,6 +113,33 @@ export function assertWellFormed(c: BenchmarkCase, dir = CASES_DIR): void {
     throw new Error(`${c.id}: no entry of the notes describes the change`)
 }
 
+// The packages whose types the case's package imports, served next to it: each version's real
+// package.json and declarations under dependencies/<name>@<version>, a scope as its own folder
+// (dependencies/@tanstack/query-core@5.100.14).
+function dependenciesOf(caseDir: string): FakePackage[] {
+  const root = join(caseDir, "dependencies")
+  if (!existsSync(root)) return []
+  const byName = new Map<string, FakePackage>()
+  const folders = readdirSync(root).flatMap((name) =>
+    name.startsWith("@")
+      ? readdirSync(join(root, name)).map((inner) => `${name}/${inner}`)
+      : [name]
+  )
+  for (const folder of folders.sort()) {
+    const at = folder.lastIndexOf("@")
+    if (at <= 0) throw new Error(`${folder}: expected <name>@<version>`)
+    const name = folder.slice(0, at)
+    const pkg = byName.get(name) ?? { name, versions: [] }
+    pkg.versions.push({
+      version: folder.slice(at + 1),
+      publishedAt: "2026-01-01T00:00:00Z",
+      files: readTree(join(root, folder)),
+    })
+    byName.set(name, pkg)
+  }
+  return [...byName.values()]
+}
+
 export async function runCase(
   c: BenchmarkCase,
   dir = CASES_DIR
@@ -140,6 +172,7 @@ export async function runCase(
         Object.entries(notes).map(([v, body]) => [`v${v}`, body])
       ),
     },
+    ...dependenciesOf(caseDir),
   ])
   const project = createProject({
     files: {

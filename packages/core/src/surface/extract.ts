@@ -3,12 +3,13 @@ import ts from "typescript"
 import type { Ctx } from "../options.ts"
 import { resolveEntries } from "./entries.ts"
 import { integrityHex } from "../infra/hash.ts"
-import { createVfsHost, PKG_ROOT } from "./vfs-host.ts"
 import { getTarballFiles } from "../registry/tarball.ts"
 import type { Packument } from "../registry/packument.ts"
 import type { RegistryConfig } from "../registry/npmrc.ts"
 import { ALGO, signatureText, typeText } from "./signature.ts"
+import { createVfsHost, DEPS_ROOT, PKG_ROOT } from "./vfs-host.ts"
 import { formatPath, parsePath, type Seg } from "../symbol-path.ts"
+import { type DependencyTypes, loadDependencyTypes } from "./dependencies.ts"
 import type { CanonPath, Surface, SurfaceSymbol, SymbolKind } from "../model.ts"
 
 const SYMBOL_CAP = 25_000
@@ -54,10 +55,12 @@ export async function extractSurface(
       reason: tb.reason === "offline-uncached" ? "offline-uncached" : "failed",
       detail: tb.reason,
     }
+  const deps = await loadDependencyTypes(ctx, cfg, p.name, tb.files)
   const result = await ctx.heavy(async () =>
-    build(p.name, version, integrity, tb.files, wantedSubpaths)
+    build(p.name, version, integrity, tb.files, wantedSubpaths, deps)
   )
-  await ctx.cache.setJson(key, result, ctx.now)
+  // missing a dependency's types for a reason that may pass: good for this run, not for the next
+  if (!deps.transient) await ctx.cache.setJson(key, result, ctx.now)
   return result
 }
 
@@ -66,7 +69,11 @@ export function build(
   version: string,
   integrity: string,
   files: Map<string, Buffer>,
-  wantedSubpaths: string[] = []
+  wantedSubpaths: string[] = [],
+  deps: Pick<DependencyTypes, "packages" | "versions"> = {
+    packages: new Map(),
+    versions: {},
+  }
 ): ExtractResult {
   const pjBuf = files.get("package.json")
   let pj: Record<string, unknown> = {}
@@ -97,7 +104,7 @@ export function build(
     allowJs: false,
     noLib: false,
   }
-  const host = createVfsHost(files)
+  const host = createVfsHost(files, deps.packages)
   const program = ts.createProgram({
     rootNames: entries.map((e) => `${PKG_ROOT}/${e.typesFile}`),
     options,
@@ -118,10 +125,12 @@ export function build(
   if (wildcardTruncated) flags.add("wildcard-truncated")
   let count = 0
 
+  // declared by the package or by a dependency whose types it uses, not by the TypeScript lib
   const inPackage = (s: ts.Symbol | undefined) =>
-    !!s?.declarations?.some((d) =>
-      d.getSourceFile().fileName.startsWith(`${PKG_ROOT}/`)
-    )
+    !!s?.declarations?.some((d) => {
+      const file = d.getSourceFile().fileName
+      return file.startsWith(`${PKG_ROOT}/`) || file.startsWith(`${DEPS_ROOT}/`)
+    })
   const deprecatedOf = (s: ts.Symbol) =>
     !!s.declarations?.some((d) => ts.getJSDocDeprecatedTag(d))
   // `class HttpResponse extends FetchResponse`, FetchResponse imported from a dependency: `any` here
@@ -594,6 +603,9 @@ export function build(
       algo: ALGO,
       typesFrom: pkg.startsWith("@types/") ? "@types" : "package",
       entries: surfaceEntries,
+      ...(Object.keys(deps.versions).length > 0
+        ? { dependencyTypes: deps.versions }
+        : {}),
       symbols,
       flags: [...flags].sort(),
     },
@@ -651,8 +663,8 @@ function unresolvedReexports(
   return out
 }
 
-// Imports of the package's own dependencies resolve to nothing in the virtual host, the same way in
-// both versions. Worth a flag, not worth a full type check to find.
+// Imports of dependencies whose types were not loaded (none, too many, too large, unreachable)
+// resolve to nothing in the virtual host. Worth a flag, not worth a full type check to find.
 function hasUnresolvedImports(
   program: ts.Program,
   options: ts.CompilerOptions,

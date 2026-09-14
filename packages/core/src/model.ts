@@ -240,6 +240,8 @@ export interface Surface {
     string,
     { typesFile: string; exportEquals: boolean; externalReexports?: string[] }
   >
+  // dependency -> version whose declarations were loaded next to the package's own
+  dependencyTypes?: Record<string, string>
   symbols: Record<CanonPath, SurfaceSymbol>
   flags: SurfaceFlag[]
 }
