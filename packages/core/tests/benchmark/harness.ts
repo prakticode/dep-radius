@@ -155,6 +155,8 @@ export interface RunCaseOptions {
   onBrief?: (brief: PackageBrief) => void
   // the JavaScript of each version, for the code hints
   runtime?: RuntimeFiles
+  // change records to join with the rules' own, <name>@<version>.json files
+  recordsDir?: string
 }
 
 export async function runCase(
@@ -212,6 +214,7 @@ export async function runCase(
     const opts = testOptions(project.root, {
       specs: [`${c.package}@${c.to}`],
       surface: withTypes,
+      ...(options.recordsDir ? { recordsDir: options.recordsDir } : {}),
     })
     const brief = await run(opts, testCtx(opts, registry))
     const pkg = brief.packages.find((p) => p.pkg === c.package)

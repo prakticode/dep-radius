@@ -6,9 +6,12 @@ import ts from "typescript"
 import { scanUsage } from "./usage/scan.ts"
 import { matchNotes } from "./notes/match.ts"
 import { limitsFor } from "./render/limits.ts"
+import { loadRecords } from "./records/load.ts"
+import { subjectSites } from "./records/join.ts"
 import { collectNotes } from "./notes/collect.ts"
 import { buildPackageBrief } from "./analyze/brief.ts"
 import { getPackument } from "./registry/packument.ts"
+import { validateRecords } from "./records/validate.ts"
 import { buildInventory } from "./inventory/installed.ts"
 import { selectCandidate } from "./registry/candidates.ts"
 import { listProjectFiles } from "./inventory/manifests.ts"
@@ -186,6 +189,8 @@ export async function run(
     const {
       blindSpots: surfaceBlind,
       options: typedOptions,
+      paths,
+      surfaces,
       ...surfaceOut
     } = surface
     // with types, the options a call accepts; without, the keys the code passes are the only clue
@@ -193,6 +198,18 @@ export async function run(
       surface.status === "computed"
         ? (typedOptions ?? {})
         : (usage?.passedOptions ?? {})
+    const records =
+      notes && opts.recordsDir
+        ? validateRecords(
+            await loadRecords(
+              opts.recordsDir,
+              dep.name,
+              notes.entries.map((e) => e.version)
+            ),
+            notes.entries,
+            surfaces
+          )
+        : []
     const match = notes
       ? matchNotes(
           notes.entries,
@@ -201,6 +218,8 @@ export async function run(
           {
             accepted: Object.keys(optionSites),
             typesRead: surface.status === "computed",
+            ...(records.length > 0 ? { records } : {}),
+            ...(records.length > 0 && paths ? { paths } : {}),
           }
         )
       : undefined
@@ -234,7 +253,10 @@ export async function run(
         notes,
         match,
         notesDisabled: !opts.notes,
-        optionSites,
+        optionSites: {
+          ...subjectSites(match?.matched ?? [], paths),
+          ...optionSites,
+        },
         ...(hints?.status === "computed" ? { hints: hints.hints } : {}),
       })
     )

@@ -320,6 +320,8 @@ export interface NoteHit {
   region: RegionKind
   // an option a function you call accepts, whether or not the code passes it
   option?: true
+  // the API of a change record the hit comes from, rather than a name in the note's words
+  subject?: string
 }
 
 export interface NoteMatch {

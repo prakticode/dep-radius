@@ -1,4 +1,5 @@
-import type { NoteEntry } from "../model.ts"
+import type { ChangeRecord } from "../records/record.ts"
+import type { CanonPath, NoteEntry, Site } from "../model.ts"
 import { joinRecords, type MatchResult } from "../records/join.ts"
 import { DEMOTE_SHARE, isCodeShaped, rulesRecords } from "../records/rules.ts"
 
@@ -17,6 +18,10 @@ export interface MatchOptions {
   // the package's types were read, so a note naming an API radius does not see you use is about
   // someone else's API; without them, it may be an option or a member the scan cannot tell apart
   typesRead?: boolean
+  // records made outside the run, already validated: their subjects join with the paths below
+  records?: ChangeRecord[]
+  // the APIs the code reaches, from the types, with their sites
+  paths?: Record<CanonPath, Site[]>
 }
 
 export function matchNotes(
@@ -34,10 +39,11 @@ export function matchNotes(
     { names: [...strong, ...weak], options: accepted },
     { demoteShare: options.demoteShare }
   )
-  return joinRecords(entries, records, {
+  return joinRecords(entries, [...records, ...(options.records ?? [])], {
     strong,
     weak,
     accepted,
     typesRead: options.typesRead ?? true,
+    ...(options.paths ? { paths: options.paths } : {}),
   })
 }

@@ -1,6 +1,14 @@
 import { isCodeShaped } from "./rules.ts"
-import type { ChangeRecord, Mention } from "./record.ts"
-import type { NoteEntry, NoteHit, NoteMatch, RegionKind } from "../model.ts"
+import { lastName } from "../symbol-path.ts"
+import { type ChangeRecord, type Mention, parseSubject } from "./record.ts"
+import type {
+  CanonPath,
+  NoteEntry,
+  NoteHit,
+  NoteMatch,
+  RegionKind,
+  Site,
+} from "../model.ts"
 
 export interface MatchResult {
   matched: NoteMatch[]
@@ -20,6 +28,8 @@ export interface ProjectUse {
   // the package's types were read, so a note naming an API radius does not see you use is about
   // someone else's API; without them, it may be an option or a member the scan cannot tell apart
   typesRead: boolean
+  // the APIs the code reaches, resolved against the installed version's types, with their sites
+  paths?: Record<CanonPath, Site[]>
 }
 
 // The records of each entry against what the project uses: a note whose record names something
@@ -45,12 +55,13 @@ export function joinRecords(
   const unattributedChanges: NoteEntry[] = []
   for (const e of live) {
     const own = byEntry.get(e.id) ?? []
+    // what the rules read of the entry itself; other records only add subjects
+    const rules = own.find((r) => r.source === "rules")
     const mentions = new Map<string, Mention>()
     const options = new Map<string, Mention>()
-    for (const r of own)
-      for (const m of r.mentions ?? [])
-        (m.option ? options : mentions).set(m.name, m)
-    const breaking = own[0]?.breaking ?? e.breakingMarker
+    for (const m of rules?.mentions ?? [])
+      (m.option ? options : mentions).set(m.name, m)
+    const breaking = rules?.breaking ?? e.breakingMarker
 
     const hits: NoteHit[] = []
     for (const n of names) {
@@ -75,8 +86,18 @@ export function joinRecords(
       if (region) hits.push({ name, strength: "weak", region, option: true })
     }
 
-    const namesApi = own.find((r) => r.namesApi)?.namesApi ?? "none"
-    const kind = own[0]?.kind ?? e.kind
+    const subjects = [...new Set(own.flatMap((r) => r.subjects))].sort()
+    for (const subject of subjects) {
+      const hit = subjectHit(subject, use)
+      if (hit && !hits.some((h) => h.name === hit.name)) hits.push(hit)
+    }
+    // A record only ever adds a tie. Subjects none of which the code reaches do not make a change
+    // someone else's: a record can name the type of an options object (`ThrottleConfig`) rather
+    // than the call that takes it, or one of the paths an API is exported at, and the change would
+    // then leave the update quiet on a note about code the project uses.
+
+    const namesApi = rules?.namesApi ?? "none"
+    const kind = rules?.kind ?? e.kind
     if (hits.length > 0)
       matched.push({
         entry: e,
@@ -100,4 +121,55 @@ export function joinRecords(
     unattributedChanges,
     total: live.length,
   }
+}
+
+// A subject lands on the code that reaches its API, or anything under it. Without types there are
+// no paths, only names: the last name of the API, or the option. A record's subjects are what a
+// reader or a model understood, never the note's own words, so the hit is never direct.
+function subjectHit(subject: string, use: ProjectUse): NoteHit | undefined {
+  const { path, option } = parseSubject(subject)
+  const name = option ?? lastName(path)
+  const hit: NoteHit = {
+    name,
+    strength: "weak",
+    region: "prose",
+    ...(option ? { option: true as const } : {}),
+    subject,
+  }
+  if (use.paths) return reaches(use.paths, path) ? hit : undefined
+  const named = (n: string) => use.strong.includes(n) || use.weak.includes(n)
+  if (named(name) || (option !== undefined && use.accepted.includes(option)))
+    return hit
+  // an option nobody passes still lands on the calls of the API that takes it
+  const api = lastName(path)
+  return option !== undefined && api && named(api)
+    ? { name: api, strength: "weak", region: "prose", subject }
+    : undefined
+}
+
+function reaches(paths: Record<CanonPath, Site[]>, path: CanonPath): boolean {
+  return Object.keys(paths).some((p) => isUnder(p, path))
+}
+
+function isUnder(used: CanonPath, path: CanonPath): boolean {
+  return (
+    used === path || used.startsWith(`${path}.`) || used.startsWith(`${path}#`)
+  )
+}
+
+// The sites a hit from a subject lands on, for the names the usage scan does not already know.
+export function subjectSites(
+  matched: NoteMatch[],
+  paths: Record<CanonPath, Site[]> | undefined
+): Record<string, Site[]> {
+  const out: Record<string, Site[]> = {}
+  if (!paths) return out
+  for (const m of matched)
+    for (const h of m.hits) {
+      if (!h.subject) continue
+      const { path } = parseSubject(h.subject)
+      for (const [p, sites] of Object.entries(paths))
+        if (isUnder(p, path)) out[h.name] = [...(out[h.name] ?? []), ...sites]
+    }
+  return out
 }

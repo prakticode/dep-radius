@@ -28,6 +28,10 @@ export type SurfaceOutcome = PackageBrief["surface"] & {
   blindSpots?: Counted<BlindSpotKind>[]
   // option names the functions you call accept, with the calls: what a note about an option lands on
   options?: Record<string, Site[]>
+  // the APIs the code reaches in the installed version, with their sites
+  paths?: Record<CanonPath, Site[]>
+  // both versions' surfaces, which what a change record names must exist in
+  surfaces?: { from: Surface; to: Surface }
 }
 
 export interface SurfaceContext {
@@ -212,6 +216,10 @@ export async function analyzeSurface(
         order(x) - order(y) || x.change.path.localeCompare(y.change.path)
     ),
     incomplete: !!detail,
+    paths: Object.fromEntries(
+      [...byPath].map(([path, sites]) => [path, uniqueSites(sites)])
+    ),
+    surfaces: { from: a.surface, to: b.surface },
     ...(byOption.size > 0
       ? {
           options: Object.fromEntries(
