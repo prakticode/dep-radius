@@ -371,6 +371,24 @@ describe("options", () => {
     expect(cjs.symbols["p:"]?.options).toEqual(["max", "ssl"])
   })
 
+  it("records the options of an options object one level down", () => {
+    const s = surface(
+      [
+        "type NumberOptions = { hex: boolean; eNotation?: boolean }",
+        "type Deep = { level?: { tooDeep?: boolean } }",
+        "export declare function parse(xml: string, options?: { numberParseOptions?: NumberOptions; deep?: Deep; tags?: string[] }): unknown",
+      ].join("\n")
+    )
+    expect(s.symbols["p:parse"]?.options).toEqual([
+      "deep",
+      "eNotation",
+      "hex",
+      "level",
+      "numberParseOptions",
+      "tags",
+    ])
+  })
+
   it("reads no options from an intersection computed from a type argument", () => {
     const s = surface(
       [

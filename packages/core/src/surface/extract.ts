@@ -199,6 +199,7 @@ export function build(
   // Construct signatures count the same as call signatures: `new Parser({ strict })` takes options.
   const optionsOf = (sigs: readonly ts.Signature[]): string[] | undefined => {
     const names = new Set<string>()
+    const nested = new Set<string>()
     for (const sig of sigs)
       for (const param of sig.getParameters()) {
         const decl = param.valueDeclaration
@@ -211,9 +212,22 @@ export function build(
         } catch {
           continue
         }
-        for (const prop of optionProps(t)) names.add(prop.getName())
+        for (const prop of optionProps(t)) {
+          names.add(prop.getName())
+          // one level down, `numberParseOptions: { eNotation?: boolean }`: a note names the leaf
+          let inner: ts.Type
+          try {
+            inner = checker.getNonNullableType(checker.getTypeOfSymbol(prop))
+          } catch {
+            continue
+          }
+          for (const sub of optionProps(inner)) nested.add(sub.getName())
+        }
       }
     if (names.size === 0 || names.size > OPTIONS_CAP) return undefined
+    // the nested names only while they fit: past the cap they would cost the options themselves
+    if (names.size + nested.size <= OPTIONS_CAP)
+      for (const name of nested) names.add(name)
     return [...names].sort()
   }
 

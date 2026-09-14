@@ -9,3 +9,6 @@ inherited constructors and `export =` classes included, the same way `config({ q
 for functions. Options types written as an intersection (`CurrentOptions & DeprecatedOptions`) are
 read too. A method called on the constructed object (`new Parser().parse()`) is now found in the
 types as well.
+
+Options one level down count too: a note about `eNotation` lands on `new XMLParser({ ... })`, whose
+options take `numberParseOptions: { eNotation }`.
