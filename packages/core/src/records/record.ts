@@ -26,6 +26,8 @@ export interface ChangeRecord {
   confidence?: number
   // which extractor, at which version, made the record: "rules@1", "ai:<model>:<prompt version>"
   extractor: string
+  // how a record made outside the run came to be: its runs, what it was checked against
+  provenance?: Record<string, unknown>
 }
 
 export type Subject = string
