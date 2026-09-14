@@ -198,7 +198,8 @@
             "entries",
             "versions",
             "matched",
-            "breakingWithoutApi"
+            "breakingWithoutApi",
+            "changesWithoutApi"
           ],
           "properties": {
             "coverage": { "type": "string" },
@@ -262,6 +263,19 @@
               }
             },
             "breakingWithoutApi": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["version", "title", "refs"],
+                "properties": {
+                  "version": { "type": "string" },
+                  "title": { "type": "string" },
+                  "refs": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            },
+            "changesWithoutApi": {
               "type": "array",
               "items": {
                 "type": "object",

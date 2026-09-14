@@ -58,6 +58,7 @@ export type Finding =
   | { kind: "type"; touched: Touched }
   | { kind: "note"; match: NoteMatch }
   | { kind: "breaking-no-api"; entry: NoteEntry }
+  | { kind: "change-no-api"; entry: NoteEntry }
 
 // What a package's reader sees, most pressing first: what breaks and is tied to their code, then
 // what is tied to it, then what may break, then what may concern them. Nothing is left out, and
@@ -69,6 +70,7 @@ export function orderFindings(p: PackageBrief): Finding[] {
       return f.touched.bucket === "removed" ? 0 : 1
     }
     if (f.kind === "breaking-no-api") return 2
+    if (f.kind === "change-no-api") return 3
     if (f.match.entry.breakingMarker) return f.match.direct ? 0 : 2
     return f.match.direct ? 1 : 3
   }
@@ -77,6 +79,10 @@ export function orderFindings(p: PackageBrief): Finding[] {
     ...p.notes.matched.map((match) => ({ kind: "note" as const, match })),
     ...p.notes.unattributedBreaking.map((entry) => ({
       kind: "breaking-no-api" as const,
+      entry,
+    })),
+    ...p.notes.unattributedChanges.map((entry) => ({
+      kind: "change-no-api" as const,
       entry,
     })),
   ]

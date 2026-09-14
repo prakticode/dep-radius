@@ -71,6 +71,14 @@ export function decide(input: VerdictInput): {
       detail: `${notes.unattributedBreaking.length} breaking ${plural(notes.unattributedBreaking.length, "note")} naming no API, which can apply to anyone`,
     })
   }
+  // a fix or a change nothing ties to the code may still be about it: quiet cannot ignore it
+  const unplaced = notes.unattributedChanges.length
+  if (unplaced > 0) {
+    reasons.push({
+      code: "unattributed-change",
+      detail: `${unplaced} release ${plural(unplaced, "note")} ${unplaced === 1 ? "describes a change" : "describe changes"} radius cannot tie to your code`,
+    })
+  }
 
   const blind = usage?.blindSpots ?? []
   if (blind.length > 0)
@@ -128,7 +136,8 @@ export function decide(input: VerdictInput): {
     surfaceComputed &&
     surface.touched.length === 0 &&
     notes.matched.length === 0 &&
-    notes.unattributedBreaking.length === 0
+    notes.unattributedBreaking.length === 0 &&
+    notes.unattributedChanges.length === 0
   if ((input.bump === "major" || input.zeroMajor) && !bothClean) {
     reasons.push({
       code: "major-unproven",
@@ -143,7 +152,8 @@ export function decide(input: VerdictInput): {
     if (notesComplete)
       reasons.push({
         code: "notes-complete-no-match",
-        detail: "every release note read, none mentions what you use",
+        detail:
+          "every release note read: none mentions what you use, and none changes something radius cannot place",
       })
     if (surfaceComputed)
       reasons.push({

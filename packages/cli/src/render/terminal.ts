@@ -151,6 +151,8 @@ function packageBlock(
   let touches = 0
   let notes = 0
   let previous: Finding["kind"] | undefined
+  const unplacedCap = opts.verbose ? Number.POSITIVE_INFINITY : 3
+  let unplaced = 0
   for (const f of orderFindings(p)) {
     if (f.kind === "type") {
       if (++touches > touchCap) continue
@@ -188,21 +190,35 @@ function packageBlock(
       for (const s of sites.slice(0, shown)) lines.push(`    ${siteLabel(s)}`)
       if (sites.length > shown)
         lines.push(c("dim", `    ... ${sites.length - shown} more sites`))
-    } else {
+    } else if (f.kind === "breaking-no-api") {
       if (previous !== "note" && previous !== "breaking-no-api") lines.push("")
       lines.push(
         `  ${c("cyan", f.entry.version)}  ${f.entry.title}  ${c("dim", "breaking, names no API")}`
       )
+    } else {
+      if (++unplaced > unplacedCap) continue
+      if (previous === "type") lines.push("")
+      lines.push(
+        `  ${c("cyan", f.entry.version)}  ${f.entry.title}  ${c("dim", "cannot tie to your code")}`
+      )
     }
     previous = f.kind
   }
-  if (touches > touchCap || notes > noteCap) lines.push("")
+  if (touches > touchCap || notes > noteCap || unplaced > unplacedCap)
+    lines.push("")
   if (touches > touchCap)
     lines.push(
       c("dim", `  ... ${touches - touchCap} more changes you touch (--verbose)`)
     )
   if (notes > noteCap)
     lines.push(c("dim", `  ... ${notes - noteCap} more notes (--verbose)`))
+  if (unplaced > unplacedCap)
+    lines.push(
+      c(
+        "dim",
+        `  ... ${unplaced - unplacedCap} more ${unplaced - unplacedCap === 1 ? "change" : "changes"} radius cannot tie to your code (--verbose)`
+      )
+    )
 
   lines.push("")
   for (const r of p.reasons) lines.push(c("dim", `  why: ${r.detail}`))

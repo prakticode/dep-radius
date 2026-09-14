@@ -46,11 +46,11 @@ Two nets, counted apart and never merged into one reassuring number:
 2. **The release notes.** GitHub releases or the changelog, split into entries, kept only when they
    name something you use.
 
-| Verdict | Exit | Means                                                                |
-| ------- | ---- | -------------------------------------------------------------------- |
-| quiet   | 0    | nothing you use changed, no note mentions it: merge without reading  |
-| review  | 1    | here are the lines concerned, or here is what the tool could not see |
-| blocked | 2    | an export you call was removed                                       |
+| Verdict | Exit | Means                                                                           |
+| ------- | ---- | ------------------------------------------------------------------------------- |
+| quiet   | 0    | nothing you use changed, and every note is accounted for: merge without reading |
+| review  | 1    | here are the lines concerned, or here is what the tool could not see            |
+| blocked | 2    | an export you call was removed                                                  |
 
 Anything the tool cannot see pushes towards review, never towards quiet: packages used only from
 scripts, config strings or CSS, names passed around whole, packages with neither types nor notes. A

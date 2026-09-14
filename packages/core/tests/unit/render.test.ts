@@ -78,6 +78,7 @@ function pkg(): PackageBrief {
         note("parse docs", false, false),
       ],
       unattributedBreaking: [entry("Drop Node 18", true)],
+      unattributedChanges: [],
     },
     usage: {
       files: 1,

@@ -34,6 +34,7 @@ function pkg(
       total: 0,
       matched: [],
       unattributedBreaking: [],
+      unattributedChanges: [],
     },
     usage: {
       files: 1,
@@ -180,6 +181,7 @@ describe("renderTerminal", () => {
           },
         ],
         unattributedBreaking: [],
+        unattributedChanges: [],
       },
       usage: {
         files: 1,

@@ -148,6 +148,70 @@ describe("matchNotes", () => {
   })
 })
 
+describe("changes nothing ties to the code", () => {
+  const entries = splitEntries(
+    "2.11.0",
+    [
+      "- Remove empty non-boolean attributes",
+      "- fix(storage): avoid calling setItem with the state just retrieved",
+      "- Add `allowedEmptyAttributes` option",
+      "- feat: support async parsers",
+      "- perf: faster merges",
+      "- [Fix] ensure `arrayLimit` applies to [] notation as well",
+      "- The `email()` pattern changed",
+      "### Features",
+      "- Brand new sanitizer engine",
+    ].join("\n")
+  )
+  const titles = (typesRead: boolean) =>
+    matchNotes(entries, ["email"], [], { typesRead }).unattributedChanges.map(
+      (e) => e.title
+    )
+
+  it("keeps every change that names no API, but not additions or matches", () => {
+    expect(titles(true)).toEqual([
+      "Remove empty non-boolean attributes",
+      "fix(storage): avoid calling setItem with the state just retrieved",
+    ])
+  })
+
+  it("keeps a change naming an API it cannot place when the types were not read", () => {
+    expect(titles(false)).toEqual([
+      "Remove empty non-boolean attributes",
+      "fix(storage): avoid calling setItem with the state just retrieved",
+      "[Fix] ensure arrayLimit applies to [] notation as well",
+    ])
+  })
+})
+
+describe("housekeeping", () => {
+  it("reads project scopes, bracketed tags, thanks and bare links as housekeeping", () => {
+    const e = splitEntries(
+      "3.0.0",
+      [
+        "- fix(types): allow null for point values",
+        "- [meta] add threat model",
+        "- [Dev Deps] update `eslint`",
+        "- Updated dependencies [abc1234]:",
+        "- Thanks to Ada for the updates!",
+        "- [npm](https://www.npmjs.com/package/x)",
+        "- [#430]: #430",
+        "- Fix the parser on empty input",
+      ].join("\n")
+    )
+    expect(e.map((x) => [x.title, x.noise])).toEqual([
+      ["fix(types): allow null for point values", true],
+      ["[meta] add threat model", true],
+      ["[Dev Deps] update eslint", true],
+      ["Updated dependencies [abc1234]:", true],
+      ["Thanks to Ada for the updates!", true],
+      ["npm", true],
+      ["[#430]: #430", true],
+      ["Fix the parser on empty input", false],
+    ])
+  })
+})
+
 describe("matchNotes with the options of calls you make", () => {
   const entries = splitEntries(
     "8.0.0",

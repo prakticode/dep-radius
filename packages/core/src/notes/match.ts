@@ -34,6 +34,9 @@ function namesAnApi(e: NoteEntry): boolean {
 export interface MatchResult {
   matched: NoteMatch[]
   unattributedBreaking: NoteEntry[]
+  // changes nothing ties to the code: a fix or a change that names no API, or names one radius
+  // cannot place without types. Each one is a note quiet would have to ignore
+  unattributedChanges: NoteEntry[]
   total: number
 }
 
@@ -44,6 +47,25 @@ export interface MatchOptions {
   // option names the functions you call accept, from their types: a note about a default lands on
   // the calls that never pass it
   accepted?: string[]
+  // the package's types were read, so a note naming an API radius does not see you use is about
+  // someone else's API; without them, it may be an option or a member the scan cannot tell apart
+  typesRead?: boolean
+}
+
+// What adds without changing what exists: a feature, a new option, a speed-up.
+const ADDITION_TITLE =
+  /^(feat|feature|perf)(\([^)]*\))?!?:|^(add|adds|added|new|support|supports|introduce|introduces|expose|exposes|allow|allows)\b/i
+const ADDITION_HEADING = /feature|added|\bnew\b|performance|\bperf\b/i
+
+function isAddition(e: NoteEntry): boolean {
+  const title = e.title
+    .replace(/^[0-9a-f]{7,40}\s+/, "")
+    .replace(/^(?:#\d+\s+)+/, "")
+    .replace(/^\*\*[^*]+\*\*:?\s*/, "")
+  return (
+    ADDITION_TITLE.test(title) ||
+    e.headingPath.some((h) => ADDITION_HEADING.test(h))
+  )
 }
 
 // An option is named in a note's words or code spans, never in its examples: as a code-shaped
@@ -125,6 +147,8 @@ export function matchNotes(
 
   const matched: NoteMatch[] = []
   const unattributedBreaking: NoteEntry[] = []
+  const unattributedChanges: NoteEntry[] = []
+  const typesRead = options.typesRead ?? true
   for (const e of live) {
     const hits: NoteHit[] = []
     const scope = scopeOf(e)
@@ -161,11 +185,18 @@ export function matchNotes(
         ),
       })
     else if (e.breakingMarker && !namesAnApi(e)) unattributedBreaking.push(e)
+    else if (!isAddition(e) && (!namesAnApi(e) || !typesRead))
+      unattributedChanges.push(e)
   }
   matched.sort(
     (a, b) =>
       Number(b.direct) - Number(a.direct) ||
       Number(b.entry.breakingMarker) - Number(a.entry.breakingMarker)
   )
-  return { matched, unattributedBreaking, total: live.length }
+  return {
+    matched,
+    unattributedBreaking,
+    unattributedChanges,
+    total: live.length,
+  }
 }

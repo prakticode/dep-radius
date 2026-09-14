@@ -28,6 +28,9 @@ Any one of these is enough:
 
 - A note names something you use.
 - A breaking note names no API at all, so it could be about anyone, including you.
+- A note describes a change radius can't tie to your code: "Remove empty non-boolean attributes",
+  or a fix naming an option it can't see. Radius lists them; each is a line to read, not a whole
+  changelog.
 
 **radius can't fully see how you use the package**
 
@@ -47,8 +50,14 @@ Everything else. Concretely, for an update to be quiet:
 
 - every name your code uses was found in the old types,
 - nothing radius can't see is in the way,
+- every release note that describes a change is accounted for: it names something you don't use,
+  or it's housekeeping (docs, tests, CI, dependency updates) or an addition (a new feature or
+  option),
 - and at least one net is complete with zero hits: all the release notes were read and none
   mentions you, or the types were compared and nothing you use changed.
+
+That third condition makes quiet rare. Most releases carry at least one fix written in plain words,
+and radius can't prove such a fix doesn't concern you, so it asks you to read that line.
 
 <Callout title="The asterisk">
   A quiet verdict that stood on **one net only** (no types, or notes missing for some versions) is
@@ -65,7 +74,7 @@ Before its first release, radius was backtested on 462 real dependency upgrades 
 repositories: every update it would have called quiet was checked against what the project actually
 had to change. Zero wrong quiets. That backtest only sees breaks that forced a code change, though:
 [the behaviour change benchmark](/docs/benchmark) replays documented changes to code a project
-relies on, and radius calls 13 of its 51 upgrades quiet. Found one? Please
+relies on. It found 13 upgrades radius called quiet, which led to the rule that every change note must be accounted for; none of its 51 upgrades is quiet now. Found one? Please
 [open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose), it's the
 most useful report there is.
 

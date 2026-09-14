@@ -38,6 +38,7 @@ const clean = (over: Partial<VerdictInput> = {}): VerdictInput => ({
     total: 4,
     matched: [],
     unattributedBreaking: [],
+    unattributedChanges: [],
   },
   ...over,
 })
@@ -113,6 +114,7 @@ describe("decide", () => {
         total: 1,
         matched: [{ entry, hits: [], direct: true }],
         unattributedBreaking: [],
+        unattributedChanges: [],
       },
     })
     expect(decide(withNote).verdict).toBe("review")
@@ -125,6 +127,7 @@ describe("decide", () => {
             total: 1,
             matched: [],
             unattributedBreaking: [entry],
+            unattributedChanges: [],
           },
         })
       ).verdict
@@ -138,6 +141,29 @@ describe("decide", () => {
         })
       ).verdict
     ).toBe("review")
+  })
+
+  it("never calls an update quiet while a note describes a change it cannot tie to the code", () => {
+    const d = decide(
+      clean({
+        notes: {
+          coverage: "complete",
+          perVersion: [],
+          total: 3,
+          matched: [],
+          unattributedBreaking: [],
+          unattributedChanges: [entry, entry],
+        },
+      })
+    )
+    expect(d.verdict).toBe("review")
+    expect(d.reasons).toEqual([
+      {
+        code: "unattributed-change",
+        detail:
+          "2 release notes describe changes radius cannot tie to your code",
+      },
+    ])
   })
 
   it("never calls side effect, config or script usage quiet", () => {
@@ -182,6 +208,7 @@ describe("decide", () => {
           total: 0,
           matched: [],
           unattributedBreaking: [],
+          unattributedChanges: [],
         },
       })
     )

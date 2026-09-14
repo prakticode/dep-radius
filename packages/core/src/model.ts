@@ -329,6 +329,7 @@ export type ReasonCode =
   | "possibly-touched"
   | "notes-match"
   | "unattributed-breaking"
+  | "unattributed-change"
   | "blind-spots"
   | "opaque-usage"
   | "not-referenced"
@@ -387,6 +388,8 @@ export interface PackageBrief {
     total: number
     matched: NoteMatch[]
     unattributedBreaking: NoteEntry[]
+    // changes no name ties to the code: they keep an update from being quiet
+    unattributedChanges: NoteEntry[]
   }
   usage: {
     files: number

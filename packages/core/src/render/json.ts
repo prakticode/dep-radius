@@ -69,6 +69,7 @@ export interface PackageV1 {
       names: { name: string; certainty: "exact" | "by-name"; where: string }[]
     }[]
     breakingWithoutApi: { version: string; title: string; refs: string[] }[]
+    changesWithoutApi: { version: string; title: string; refs: string[] }[]
   }
   usage: {
     files: number
@@ -193,6 +194,7 @@ function packageV1(p: PackageBrief): PackageV1 {
         })),
       })),
       breakingWithoutApi: p.notes.unattributedBreaking.map(entryV1),
+      changesWithoutApi: p.notes.unattributedChanges.map(entryV1),
     },
     usage: {
       files: p.usage.files,

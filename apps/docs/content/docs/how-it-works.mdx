@@ -97,7 +97,13 @@ sets (`Content-Security-Policy` for `contentSecurityPolicy`), and these matches 
 "possibly".
 
 A commit title that starts with an API, `diff: fix prerelease to stable` or `fix(diff): ...`, names
-that API even when the rest is plain words. The types only tell which options
+that API even when the rest is plain words.
+
+Some notes describe a change without naming anything radius can tie to your code: "Remove empty
+non-boolean attributes", or a fix to an option of a package without types. Those notes keep an
+update from being quiet, and each one is listed so you read that line instead of the changelog.
+Housekeeping (docs, tests, CI, dependency updates, thanks) and additions (new features, new options,
+speed-ups) don't count. The types only tell which options
 exist here: they never make a note count as more, or less, than a note.
 
 </Step>
