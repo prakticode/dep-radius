@@ -11,6 +11,9 @@ export interface PackageLines {
   options: Set<number>
   // lines where a type imported from the package is written
   types: Set<number>
+  // lines of an import, require or re-export of the package, every line of a multi-line one: a
+  // fix rewriting them follows a moved or renamed entry point
+  imports: Set<number>
 }
 
 const SCRIPT = /<script\b[^>]*>([\s\S]*?)<\/script>/gi
@@ -102,6 +105,7 @@ export function packageLines(
     refs: new Set(),
     options: new Set(),
     types: new Set(),
+    imports: new Set(),
   }
   const text = scriptOf(file, source)
   const sf = ts.createSourceFile(
@@ -118,13 +122,25 @@ export function packageLines(
   const lineOf = (n: ts.Node) =>
     sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1
 
+  const spanned = (n: ts.Node) => {
+    const end = sf.getLineAndCharacterOfPosition(n.getEnd()).line + 1
+    for (let l = lineOf(n); l <= end; l++) out.imports.add(l)
+  }
   const locals = new Set<string>()
   const collect = (n: ts.Node): void => {
     if (
+      ts.isExportDeclaration(n) &&
+      n.moduleSpecifier &&
+      ts.isStringLiteral(n.moduleSpecifier) &&
+      fromPackage(n.moduleSpecifier.text, pkg)
+    ) {
+      spanned(n)
+    } else if (
       ts.isImportDeclaration(n) &&
       ts.isStringLiteral(n.moduleSpecifier) &&
       fromPackage(n.moduleSpecifier.text, pkg)
     ) {
+      spanned(n)
       const c = n.importClause
       if (c?.name) locals.add(c.name.text)
       const nb = c?.namedBindings
@@ -137,11 +153,17 @@ export function packageLines(
       ts.isStringLiteral(n.moduleReference.expression) &&
       fromPackage(n.moduleReference.expression.text, pkg)
     ) {
+      spanned(n)
       locals.add(n.name.text)
     } else if (ts.isVariableDeclaration(n)) {
       const spec = requiredSpecifier(n.initializer)
-      if (spec && fromPackage(spec, pkg))
+      if (spec && fromPackage(spec, pkg)) {
+        spanned(n)
         for (const name of bindingNames(n.name)) locals.add(name)
+      }
+    } else if (ts.isCallExpression(n)) {
+      const spec = requiredSpecifier(n)
+      if (spec && fromPackage(spec, pkg)) spanned(n)
     }
     ts.forEachChild(n, collect)
   }

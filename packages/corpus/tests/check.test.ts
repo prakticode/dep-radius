@@ -32,6 +32,7 @@ describe("judge", () => {
           onSite: ["src/a.ts:4"],
           options: [],
           types: [],
+          imports: [],
           names: [],
         },
       ],
@@ -49,7 +50,14 @@ describe("judge", () => {
       { zod: { names: ["coerce", "object"], sites: [] } }
     )
     expect(out.evidence).toEqual([
-      { package: "zod", onSite: [], options: [], types: [], names: ["coerce"] },
+      {
+        package: "zod",
+        onSite: [],
+        options: [],
+        types: [],
+        imports: [],
+        names: ["coerce"],
+      },
     ])
   })
 
@@ -87,6 +95,7 @@ describe("judge", () => {
         onSite: [],
         options: ["src/a.ts:4"],
         types: ["src/a.ts:4"],
+        imports: [],
         names: [],
       },
     ])

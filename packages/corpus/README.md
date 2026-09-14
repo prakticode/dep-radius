@@ -94,16 +94,18 @@ checks out the upgraded snapshot and collects, for each upgraded package:
   the attributes of its JSX components;
 - the lines writing a type imported from the package (`const x: Options`, `satisfies Plugin`,
   `Promise<Options>`), and the keys of the object such a type annotates;
+- every line of an import, require or re-export of the package: a fix rewriting one follows a moved
+  entry point;
 - the names the code uses from the package.
 
 The check result, written to the manifest's `labels.check`:
 
-| Result      | Meaning                                                                                                                        |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `supported` | An expected line is a use, an option key or a type of an upgraded package, or a changed line names what the code uses from one |
-| `weak`      | None of that: the fix may answer the upgrade further away, or be unrelated work                                                |
-| `reformat`  | Half or more of the expected lines only changed layout, whatever they use                                                      |
-| `error`     | The snapshot could not be read                                                                                                 |
+| Result      | Meaning                                                                                                                                   |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `supported` | An expected line is a use, an option key, a type or an import of an upgraded package, or a changed line names what the code uses from one |
+| `weak`      | None of that: the fix may answer the upgrade further away, or be unrelated work                                                           |
+| `reformat`  | Half or more of the expected lines only changed layout, whatever they use                                                                 |
+| `error`     | The snapshot could not be read                                                                                                            |
 
 `review.md` lists the reformat, weak and error cases of the working set, with their expected lines,
 for a person to keep or drop. The same for locked cases goes to `locked/review.md`. The terminal

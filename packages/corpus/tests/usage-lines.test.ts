@@ -54,6 +54,21 @@ describe("packageLines", () => {
     expect(lines(out.options)).toEqual([3, 5])
   })
 
+  it("finds every line of an import, a require or a re-export of the package", () => {
+    const src = [
+      `import type Token from "markdown-it/lib/token.mjs"`, // 1
+      `import {`, // 2
+      `  render,`, // 3
+      `} from "markdown-it"`, // 4
+      `const md = require("markdown-it")`, // 5
+      `export { x } from "markdown-it-anchor"`, // 6
+      `export * from "markdown-it/plugins"`, // 7
+    ].join("\n")
+    expect(lines(packageLines("a.ts", src, "markdown-it").imports)).toEqual([
+      1, 2, 3, 4, 5, 7,
+    ])
+  })
+
   it("counts JSX attributes of a package's component as options", () => {
     const src = [
       `import { Button } from "ui-kit"`,

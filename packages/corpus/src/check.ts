@@ -30,6 +30,8 @@ export interface PackageUsageFacts {
   options?: string[]
   // `file:line` where a type imported from the package is written
   types?: string[]
+  // `file:line` of the imports, requires and re-exports of the package
+  imports?: string[]
 }
 
 export interface Evidence {
@@ -40,6 +42,8 @@ export interface Evidence {
   options: string[]
   // expected lines writing a type imported from the package
   types: string[]
+  // expected lines importing the package: an entry point moved or renamed
+  imports: string[]
   // names used from the package that the fix's removed or written lines mention
   names: string[]
 }
@@ -64,7 +68,7 @@ function escape(s: string): string {
 }
 
 // A case is weak when no changed line is a use of an upgraded package, a key of an object handed to
-// one, or a type imported from one, and no changed line mentions a name the code uses from one.
+// one, a type imported from one or an import of one, and no changed line mentions a name the code uses from one.
 // Such a fix may still answer the upgrade (a changed return value handled further down), or be
 // unrelated work pushed on the same branch: only reading tells.
 export function judge(
@@ -81,6 +85,7 @@ export function judge(
     const sites = new Set(facts.sites.map((s) => `${s.file}:${s.line}`))
     const options = new Set(facts.options ?? [])
     const types = new Set(facts.types ?? [])
+    const imports = new Set(facts.imports ?? [])
     const texts = [
       ...removed.map((e) => e.text),
       ...c.added.filter((a) => files.has(a.file)).map((a) => a.text),
@@ -94,10 +99,16 @@ export function judge(
       onSite: keys.filter((k) => sites.has(k)),
       options: keys.filter((k) => options.has(k)),
       types: keys.filter((k) => types.has(k)),
+      imports: keys.filter((k) => imports.has(k)),
       names,
     }
-    if (e.onSite.length + e.options.length + e.types.length + names.length > 0)
-      evidence.push(e)
+    const count =
+      e.onSite.length +
+      e.options.length +
+      e.types.length +
+      e.imports.length +
+      names.length
+    if (count > 0) evidence.push(e)
   }
   return { weak: evidence.length === 0, evidence }
 }
@@ -142,6 +153,7 @@ async function readSnapshot(data: string, c: CaseManifest): Promise<Snapshot> {
   for (const p of c.packages) {
     const options: string[] = []
     const types: string[] = []
+    const imports: string[] = []
     for (const file of expectedFiles) {
       if (
         !c.expected.some((e) => e.file === file && e.imports.includes(p.name))
@@ -156,10 +168,12 @@ async function readSnapshot(data: string, c: CaseManifest): Promise<Snapshot> {
       const lines = packageLines(file, text, p.name)
       for (const l of lines.options) options.push(`${file}:${l}`)
       for (const l of lines.types) types.push(`${file}:${l}`)
+      for (const l of lines.imports) imports.push(`${file}:${l}`)
     }
     const facts = (usage[p.name] ??= { names: [], sites: [] })
     facts.options = options
     facts.types = types
+    facts.imports = imports
   }
   return {
     usage,
