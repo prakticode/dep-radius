@@ -1,6 +1,6 @@
 ---
 title: The behaviour change benchmark
-description: 39 real release notes that changed behaviour, and how many of them radius ties to the lines they affect. The misses included.
+description: 51 real release notes that changed behaviour, and how many of them radius ties to the lines they affect. The misses included.
 icon: FlaskConical
 ---
 
@@ -10,28 +10,34 @@ and shows where it falls short.
 
 ## The result
 
-**radius links 22 of 39 documented behaviour changes to the lines they affect (56%).**
+**radius links 24 of 51 documented behaviour changes to the lines they affect (47%).**
 
-Of all the release notes it shows next to those changes, 37% are the change itself. The rest are
+Of all the release notes it shows next to those changes, 38% are the change itself. The rest are
 notes that name something the project uses without being the change this case is about.
 
-The number that matters most is lower. The benchmark was built in two rounds:
+The number that matters most is lower. The benchmark was built in three rounds:
 
-| Round                                                        | Cases | Caught |
-| ------------------------------------------------------------ | ----- | ------ |
-| The first 14, written while radius was being built           | 14    | 12     |
-| 25 more, each fixed before radius had ever run on it          | 25    | 10     |
+| Round                                                              | Cases | Caught | Called quiet |
+| ------------------------------------------------------------------ | ----- | ------ | ------------ |
+| The first 14, written while radius was being built                 | 14    | 12     | 0            |
+| 25 more, each fixed before radius had ever run on them              | 25    | 10     | 5            |
+| 12 more, added after the fixes below, also fixed before radius ran  | 12    | 2      | 8            |
 
 The first round was written by people who knew how radius matches notes, and it shows. The second
-round is the honest estimate: **about two documented behaviour changes in five** reach the right
-line today.
+and third rounds are the honest estimate: **12 of 37 documented behaviour changes reach the right
+line (about one in three), and 13 of 37 are called quiet.**
 
-**5 of the 17 misses are called quiet.** The upgrade changes behaviour the project relies on, the
+The third round was added to check the fixes made after the second: they caught 4 more cases there,
+and 2 of the 12 new ones. Each fix was real, and narrow.
+
+**13 of the 27 misses are called quiet.** The upgrade changes behaviour the project relies on, the
 notes say so, and radius would let it through unread. That is the failure radius is built to avoid,
 and this benchmark is where it shows. The earlier [backtest](/docs/verdicts#why-quiet-is-hard-to-earn)
 found none because it only sees breaks that forced a code change.
 
 ## Progress
+
+On the first 39 cases:
 
 | Version of radius                    | Caught   | Called quiet |
 | ------------------------------------ | -------- | ------------ |
@@ -81,7 +87,9 @@ value. A removed export is the types' job and is not measured here.
 | `body-parser`     | 2.2.2 → 2.3.0    | An invalid `limit` now throws                           |
 | `jsonwebtoken`    | 8.5.1 → 9.0.0    | `verify()` rejects unsigned tokens by default           |
 | `ky`              | 1.14.1 → 1.14.2  | Uppercase `retry.methods` are retried                   |
+| `lru-cache`       | 9.0.3 → 9.1.0    | `set(key, undefined)` deletes the key                   |
 | `luxon`           | 3.2.1 → 3.3.0    | `Interval#count` no longer counts a midnight end day    |
+| `multer`          | 2.3.0 → 2.4.0    | Non-integer `limits` values are rejected                |
 | `pg`              | 7.18.2 → 8.0.0   | `ssl` verifies certificates by default                  |
 | `react-router`    | 7.8.1 → 7.8.2    | `generatePath()` encodes param values                   |
 | `semver`          | 7.6.3 → 7.7.0    | `diff()` from a prerelease to a stable version          |
@@ -98,30 +106,39 @@ name links the two. They fall into four groups.
 
 ### The note describes the change in words
 
-The note never names an API the code uses. Reading names can't connect it. Called quiet:
-`vue-router`.
+The note never names an API the code uses. Reading names can't connect it. This is the largest group,
+and the one name matching can't close. Called quiet: `csv-parse`, `knex`, `papaparse`,
+`sanitize-html`, `vue-router` and `yup`.
 
 | Package      | Upgrade          | The note says                                              |
 | ------------ | ---------------- | ---------------------------------------------------------- |
+| `chokidar`       | 3.6.0 → 4.0.0    | "Remove glob support"                                      |
+| `csv-parse`      | 6.2.1 → 7.0.0    | "align trim with ECMAScript whitespace"                    |
+| `jose`           | 5.10.0 → 6.0.0   | "private KeyObject instances can no longer be used for verify operations" |
+| `knex`           | 3.1.0 → 3.2.0    | "Prevent unexpected combinations of statements and clauses groups from executing" |
 | `marked`     | 7.0.5 → 8.0.0    | "deprecated options removed" (`headerIds` is ignored)      |
 | `marked`     | 14.1.4 → 15.0.0  | "escape html in renderers instead of tokenizers"           |
+| `papaparse`      | 5.3.2 → 5.4.0    | "Rename duplicate headers"                                 |
+| `sanitize-html`  | 2.10.0 → 2.11.0  | "Remove empty non-boolean attributes"                      |
 | `vue-router` | 5.0.6 → 5.0.7    | optional params are no longer set to an empty string       |
 | `yaml`       | 1.10.2 → 2.0.0   | "drop undefined values" when creating a mapping            |
+| `yup`            | 1.1.0 → 1.1.1    | "make null validation errors consistent across schema"     |
 | `zod`        | 4.4.3 → 4.5.0    | "improve french translation", in the commit list only      |
 
 ### The option is invisible to radius
 
 The note names an option, but radius can't tie it to the code's call: the types that declare it live
 in another package or in `@types`, the note writes it as plain words or a link, or the function comes
-from destructuring.
+from destructuring, or the option belongs to a constructor.
 
-Called quiet: `@tanstack/react-query`, `ajv` and `qs`.
+Called quiet: `@tanstack/react-query`, `ajv`, `fast-xml-parser` and `qs`.
 
 | Package                 | Upgrade              | The option                                     |
 | ----------------------- | -------------------- | ---------------------------------------------- |
 | `@tanstack/react-query` | 5.100.13 → 5.100.14  | "not subscribed", in words, declared in `query-core` |
 | `ajv`                   | 7.2.4 → 8.0.0        | `strict`, written as a link, not as code       |
 | `axios`                 | 1.15.2 → 1.16.0      | `maxContentLength` on the fetch adapter        |
+| `fast-xml-parser`       | 4.0.15 → 4.1.0       | `eNotation`, an option of `new XMLParser()`    |
 | `ioredis`               | 4.28.5 → 5.0.0       | `allowUsernameInURI`, types from `@types`      |
 | `nodemailer`            | 8.0.11 → 9.0.0       | `tls`, types from `@types`                     |
 | `qs`                    | 6.14.0 → 6.14.1      | `arrayLimit`, types from `@types`              |
@@ -129,11 +146,14 @@ Called quiet: `@tanstack/react-query`, `ajv` and `qs`.
 
 ### The name is written as code, and not matched
 
-The note does name what the code uses, in a form radius doesn't read yet.
+The note names what the code uses in a form radius doesn't read yet, or names its neighbour. Called
+quiet: `rxjs` and `zustand`.
 
 | Package       | Upgrade          | How the note names it                                   |
 | ------------- | ---------------- | ------------------------------------------------------- |
+| `rxjs`        | 7.8.0 → 7.8.1    | `throttle:` and `ThrottleConfig`, for `throttleTime`    |
 | `sharp`       | 0.32.6 → 0.33.0  | `tint` as a bare code span, on a chained call           |
+| `zustand`     | 4.5.4 → 4.5.5    | `setItem`, called inside `createJSONStorage`            |
 
 ### The name belongs to something else
 
@@ -149,14 +169,14 @@ Called quiet: `tailwind-merge`.
 
 ## What this does and doesn't show
 
-- **It measures linking, not frequency.** 39 hand-picked changes say how often radius connects a
+- **It measures linking, not frequency.** 51 hand-picked changes say how often radius connects a
   documented change to the code it affects. They don't say how often such changes happen in your
   upgrades.
 - **The projects are small.** A real project uses a package in more places, which can make a name
   match easier, and more notes match by accident.
-- **A miss is not always a review.** 12 of the 17 missed upgrades still go to review, because they
+- **A miss is not always a review.** 14 of the 27 missed upgrades still go to review, because they
   are majors, or other notes and blind spots send them there; what they lose is the pointer to the
-  right line. The other 5 are called quiet, and a quiet verdict on them is wrong.
+  right line. The other 13 are called quiet, and a quiet verdict on them is wrong.
 - **Undocumented changes are out of scope.** A change nobody wrote down is invisible to any tool that
   reads notes. Your tests remain the net for those.
 
