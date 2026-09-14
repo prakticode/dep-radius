@@ -19,6 +19,7 @@ cases/<package>-<change>/
   case.json     the change, the lines it lands on, and what radius does today
   notes/        the release notes, copied verbatim, one file per version
   project/      a small project using the package the way real code does
+  package/      optional: the package.json and declaration files of both versions, copied verbatim
 ```
 
 | Field        | What                                                                               |
@@ -32,8 +33,10 @@ cases/<package>-<change>/
 | `expect`     | The `file:line` sites the change lands on                                          |
 | `status`     | `caught` when radius links the change to at least one expected site, else `missed` |
 
-Each case runs the full pipeline against the fake registry, with the notes served as GitHub releases
-and the type surface turned off: this measures the notes, not the types.
+Each case runs the full pipeline against the fake registry, with the notes served as GitHub
+releases. The type surface is off, unless the case ships the package's real declarations under
+`package/<version>/`: a note about an option lands on the calls whose types accept it, so those
+cases need the types of both versions.
 
 ## The numbers
 
@@ -49,9 +52,12 @@ and the type surface turned off: this measures the notes, not the types.
    value. Removed exports are the types' job.
 2. Copy the notes exactly as published into `notes/<version>.md`: the release body, or the version's
    section of the changelog without its heading. Never rewrite them.
-3. Write the smallest project that uses the package the way real code does, without adding names
+3. When the change is about an option, copy `package.json` and every `.d.ts` file of both versions
+   from their npm tarballs into `package/<version>/`.
+4. Write the smallest project that uses the package the way real code does, without adding names
    just so the note matches.
-4. Write `expect` from what the change breaks, before running radius.
-5. Run `pnpm benchmark`, and set `status` to what it reports.
+5. Write `expect` from what the change breaks, before running radius. Only lines that use the
+   package count: radius points at calls, not at the code that reads their result.
+6. Run `pnpm benchmark`, and set `status` to what it reports.
 
 A missed case is as useful as a caught one: it is the next thing to fix.

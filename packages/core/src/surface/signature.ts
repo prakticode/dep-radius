@@ -4,7 +4,7 @@ import { sha1 } from "../infra/hash.ts"
 
 // Bump when a normalization changes: the cache key carries it, so old surfaces are never compared
 // with new ones.
-export const ALGO = 9
+export const ALGO = 10
 
 const FLAGS =
   ts.TypeFormatFlags.NoTruncation |

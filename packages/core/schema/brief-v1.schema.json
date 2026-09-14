@@ -253,7 +253,8 @@
                       "properties": {
                         "name": { "type": "string" },
                         "certainty": { "enum": ["exact", "by-name"] },
-                        "where": { "type": "string" }
+                        "where": { "type": "string" },
+                        "option": { "type": "boolean" }
                       }
                     }
                   }

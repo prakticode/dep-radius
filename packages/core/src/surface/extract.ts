@@ -13,6 +13,8 @@ import type { CanonPath, Surface, SurfaceSymbol, SymbolKind } from "../model.ts"
 
 const SYMBOL_CAP = 25_000
 const NAMESPACE_DEPTH = 2
+// past this many, a parameter is a whole API passed in, not an options object
+const OPTIONS_CAP = 200
 
 export type ExtractResult =
   | { ok: true; surface: Surface }
@@ -169,13 +171,53 @@ export function build(
     !!(t.flags & ts.TypeFlags.TypeParameter) &&
     (t as ts.TypeParameter & { isThisType?: boolean }).isThisType === true
 
-  const callSigs = (t: ts.Type, path: CanonPath): string[] => {
+  // The names an options object may carry: the properties the package declares on an object
+  // parameter, union members included (`{ hsts } | { strictTransportSecurity }`). A class, or a type
+  // made mostly of methods, is a value handed over rather than options, and says nothing here.
+  const optionsOf = (sigs: readonly ts.Signature[]): string[] | undefined => {
+    const names = new Set<string>()
+    for (const sig of sigs)
+      for (const param of sig.getParameters()) {
+        const decl = param.valueDeclaration
+        if (!decl) continue
+        let t: ts.Type
+        try {
+          t = checker.getNonNullableType(
+            checker.getTypeOfSymbolAtLocation(param, decl)
+          )
+        } catch {
+          continue
+        }
+        for (const part of t.isUnion() ? t.types : [t]) {
+          if (!(part.flags & ts.TypeFlags.Object)) continue
+          if (part.getCallSignatures().length > 0) continue
+          if ((part.getSymbol()?.flags ?? 0) & ts.SymbolFlags.Class) continue
+          const props = checker.getPropertiesOfType(part).filter(inPackage)
+          const methods = props.filter(
+            (prop) =>
+              checker.getTypeOfSymbol(prop).getCallSignatures().length > 0
+          )
+          if (methods.length * 2 > props.length) continue
+          for (const prop of props) names.add(prop.getName())
+        }
+      }
+    if (names.size === 0 || names.size > OPTIONS_CAP) return undefined
+    return [...names].sort()
+  }
+
+  const callSigs = (
+    t: ts.Type,
+    path: CanonPath,
+    record: SurfaceSymbol
+  ): string[] => {
     const sigs = t.getCallSignatures()
     const first = sigs[0]
     if (first) {
       const rs = typeSymbolOf(checker.getReturnTypeOfSignature(first))
       if (rs) pendingReturns.push({ path, field: "returns", target: rs })
     }
+    const options = optionsOf(sigs)
+    if (options) record.options = options
     return sigs.map((s) => signatureText(checker, s)).sort()
   }
 
@@ -221,6 +263,8 @@ export function build(
       const sigs = ptype.getCallSignatures()
       if (sigs.length > 0) {
         record.sig = sigs.map((s) => signatureText(checker, s)).sort()
+        const options = optionsOf(sigs)
+        if (options) record.options = options
         const r = checker.getReturnTypeOfSignature(sigs[0]!)
         const rs = isThisType(r) ? undefined : typeSymbolOf(r)
         if (rs) pendingReturns.push({ path, field: "returns", target: rs })
@@ -377,7 +421,7 @@ export function build(
         const t = decl
           ? checker.getTypeOfSymbolAtLocation(sym, decl)
           : checker.getTypeOfSymbol(sym)
-        const sigs = callSigs(t, path)
+        const sigs = callSigs(t, path, record)
         record.sig = sigs.length > 0 ? sigs : [typeText(checker, t)]
         if (sigs.length === 0) {
           const ts2 = typeSymbolOf(t)
@@ -472,7 +516,7 @@ export function build(
         if (emit(record)) {
           record.sig = callable
             ? [
-                ...callSigs(t, path),
+                ...callSigs(t, path, record),
                 ...construct.map((s) => `new ${signatureText(checker, s)}`),
               ].sort()
             : [typeText(checker, t)]

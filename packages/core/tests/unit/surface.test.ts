@@ -313,6 +313,40 @@ export declare function email(): EmailSchema
   })
 })
 
+describe("options", () => {
+  it("records the properties an options parameter declares, union members included", () => {
+    const s = surface(
+      [
+        "export interface ConfigOptions { path?: string; quiet?: boolean }",
+        "export declare function config(options?: ConfigOptions): void",
+        "type Hsts = { hsts?: boolean } | { strictTransportSecurity?: boolean }",
+        "export default function helmet(options?: Readonly<{ contentSecurityPolicy?: boolean } & Hsts>): void",
+        "export interface Client { get(key: string): string; quiet?: boolean }",
+        "export declare function t(key: string, options?: { returnNull?: boolean }): string",
+      ].join("\n")
+    )
+    expect(s.symbols["p:config"]?.options).toEqual(["path", "quiet"])
+    expect(s.symbols["p:default"]?.options).toEqual([
+      "contentSecurityPolicy",
+      "hsts",
+      "strictTransportSecurity",
+    ])
+    expect(s.symbols["p:t"]?.options).toEqual(["returnNull"])
+    expect(s.symbols["p:Client#get"]?.options).toBeUndefined()
+  })
+
+  it("reads nothing from a value handed over rather than options", () => {
+    const s = surface(
+      [
+        "export declare class Schema { parse(x: unknown): unknown; optional: boolean }",
+        "export interface Api { get(): void; post(): void; base?: string }",
+        "export declare function use(schema: Schema, api: Api, cb: (x: { a: 1 }) => void): void",
+      ].join("\n")
+    )
+    expect(s.symbols["p:use"]?.options).toBeUndefined()
+  })
+})
+
 describe("readTarball", () => {
   it("round-trips what the fixture packer writes, without the root folder", () => {
     const files = readTarball(

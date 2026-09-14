@@ -20,6 +20,8 @@ export interface BriefParts {
   notes: CollectedNotes | undefined
   match: MatchResult | undefined
   notesDisabled: boolean
+  // the calls that accept each option name, for the notes that name an option
+  optionSites?: Record<string, Site[]>
 }
 
 export function buildPackageBrief(parts: BriefParts): PackageBrief {
@@ -72,7 +74,7 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
     usage: {
       files: usage?.files ?? 0,
       sites: uniqueSites(usage?.refs.map((r) => r.site) ?? []),
-      byName: sitesByName(usage),
+      byName: sitesByName(usage, namedOptions(parts)),
       strongNames: usage?.strongNames ?? [],
       weakNames: usage?.weakNames ?? [],
       opaque: usage?.opaque ?? [],
@@ -85,8 +87,20 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
   }
 }
 
+// Only the options a matched note names: a call accepting fifty options is not fifty uses.
+function namedOptions(parts: BriefParts): Record<string, Site[]> {
+  const out: Record<string, Site[]> = {}
+  for (const m of parts.match?.matched ?? [])
+    for (const h of m.hits) {
+      const sites = parts.optionSites?.[h.name]
+      if (sites) out[h.name] = sites
+    }
+  return out
+}
+
 export function sitesByName(
-  usage: PackageUsage | undefined
+  usage: PackageUsage | undefined,
+  optionSites: Record<string, Site[]> = {}
 ): Record<string, Site[]> {
   const map = new Map<string, Site[]>()
   for (const r of usage?.refs ?? []) {
@@ -97,6 +111,9 @@ export function sitesByName(
       map.set(name, list)
     }
   }
+  // an option you never pass still lands on the calls that accept it
+  for (const [name, sites] of Object.entries(optionSites))
+    if (!map.has(name)) map.set(name, sites)
   const out: Record<string, Site[]> = {}
   for (const name of [...map.keys()].sort())
     out[name] = uniqueSites(map.get(name)!)

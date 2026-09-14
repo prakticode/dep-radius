@@ -186,10 +186,15 @@ export async function run(
       ? matchNotes(
           notes.entries,
           usage?.strongNames ?? [],
-          usage?.weakNames ?? []
+          usage?.weakNames ?? [],
+          { accepted: Object.keys(surface.options ?? {}) }
         )
       : undefined
-    const { blindSpots: surfaceBlind, ...surfaceOut } = surface
+    const {
+      blindSpots: surfaceBlind,
+      options: optionSites,
+      ...surfaceOut
+    } = surface
     const merged =
       usage && surfaceBlind
         ? { ...usage, blindSpots: [...usage.blindSpots, ...surfaceBlind] }
@@ -203,6 +208,7 @@ export async function run(
         notes,
         match,
         notesDisabled: !opts.notes,
+        optionSites: optionSites ?? {},
       })
     )
   }

@@ -12,5 +12,6 @@ export {
   sinceLabel,
   siteLabel,
   sitesFor,
+  usedLabel,
   surfaceLabel,
 } from "./groups.ts"

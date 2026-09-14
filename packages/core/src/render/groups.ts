@@ -1,5 +1,5 @@
 import { UNSEEN_LABEL } from "../labels.ts"
-import type { Brief, PackageBrief, Site } from "../model.ts"
+import type { Brief, NoteHit, PackageBrief, Site } from "../model.ts"
 
 // reasons that say "the tool cannot see", as opposed to "something changed that you use"
 const UNSEEN = new Set([
@@ -44,6 +44,23 @@ export function isUnseenOnly(p: PackageBrief): boolean {
     p.reasons.every((r) => UNSEEN.has(r.code)) &&
     p.reasons.some((r) => r.code !== "no-evidence")
   )
+}
+
+// What ties a note to the code: names the code uses, and options of the calls it makes, which a
+// note about a default concerns even when the code never passes them.
+export function usedLabel(
+  hits: NoteHit[],
+  format: (name: string) => string = (name) => name
+): string {
+  const list = (names: string[]) => [...new Set(names)].map(format).join(", ")
+  const used = hits.filter((h) => !h.option).map((h) => h.name)
+  const options = hits.filter((h) => h.option).map((h) => h.name)
+  return [
+    ...(used.length > 0 ? [`you use: ${list(used)}`] : []),
+    ...(options.length > 0
+      ? [`an option of a call you make: ${list(options)}`]
+      : []),
+  ].join("; ")
 }
 
 export function sitesFor(p: PackageBrief, names: string[]): Site[] {
