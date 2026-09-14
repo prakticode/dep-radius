@@ -1,12 +1,12 @@
 ---
 title: GitHub Action
-description: One comment on every pull request that changes a dependency, kept up to date on every push.
+description: A comment on every pull request that changes a dependency, with the lines to check.
 icon: GitPullRequest
 ---
 
-Renovate or Dependabot opens the pull request, radius tells you if you need to read it. The Action
-runs `radius --since <base of the pull request>`, posts the brief as a comment, and edits that same
-comment on every push. Pull requests that change no dependency get no comment at all.
+Renovate or Dependabot opens a pull request. The Action runs radius on it and posts a comment: the
+answer for each changed dependency, and the lines to check. On every new push, it updates the same
+comment. Pull requests that change no dependency get no comment.
 
 <Callout title="Needs dep-radius 0.2.0 or later">
   The Action is built on `--since`, which arrives in 0.2.0. The `v0` tag always runs a version that
@@ -39,17 +39,16 @@ jobs:
       - uses: prakticode/dep-radius@v0
 ```
 
-That's all. No install step: radius reads the lockfile, it doesn't need `node_modules`. The
-`paths` filter is optional, it just saves runs on pull requests that can't change a dependency.
+That's all. No install step: radius reads the lockfile. The `paths` filter is optional. It skips
+pull requests that can't change a dependency.
 
 ## What you get
 
-- **A comment** on the pull request: a table of the changed dependencies with their verdicts, then
-  a short section for each one that needs a look, with the files and lines.
-- **The job summary**, with the same brief, even when commenting isn't allowed.
-- **A failing check** when an export your code uses was removed (you can change that, see
-  `fail-on`).
-- **Outputs** to build on, like auto-merging quiet updates.
+- **A comment**: a table of the changed dependencies and their answers, then a section for each one
+  to check, with files and lines.
+- **The job summary**: the same content, even when commenting isn't allowed.
+- **A failing check** when something your code uses was removed. You can change this with `fail-on`.
+- **Outputs** you can use in later steps, for example to auto-merge quiet updates.
 
 ## Inputs
 
@@ -58,7 +57,7 @@ That's all. No install step: radius reads the lockfile, it doesn't need `node_mo
 | `github-token`      | `${{ github.token }}`      | Comments on the pull request, and lifts GitHub's limit for release notes |
 | `base`              | the pull request's base commit | The commit to compare with                                         |
 | `working-directory` | `.`                        | The folder radius reads, for a project inside a bigger repository     |
-| `comment`           | `true`                     | `false` writes the brief to the job summary only                       |
+| `comment`           | `true`                     | `false` writes the result to the job summary only                       |
 | `fail-on`           | `blocked`                  | Fail the step on `blocked`, on `review` as well, or `never`           |
 | `version`           | the one released with the Action | The dep-radius version to run                                   |
 | `args`              | none                       | Extra options, like `--prod` or `--no-notes`                          |
@@ -69,8 +68,8 @@ That's all. No install step: radius reads the lockfile, it doesn't need `node_mo
 | ----------- | --------------------------------------------------------------------- |
 | `verdict`   | `quiet`, `review`, `blocked`, or `none` when no direct dependency changed |
 | `exit-code` | The radius exit code: `0`, `1` or `2`                                 |
-| `json`      | Path to the brief as JSON ([the format](/docs/json))                  |
-| `markdown`  | Path to the brief as Markdown                                         |
+| `json`      | Path to the result as JSON ([the format](/docs/json))                  |
+| `markdown`  | Path to the result as Markdown                                         |
 
 ## Recipes
 
@@ -107,9 +106,9 @@ jobs:
 the repository settings.
 
 <Callout type="warn" title="Keep your tests as a required check">
-  Quiet means "nothing you use changed, according to the types and the release notes". Behaviour
-  changes that no note mentions are invisible to radius. Auto-merge on quiet **and** green tests,
-  never on quiet alone.
+  Quiet means nothing your code uses changed, according to the types and the release notes. A change
+  no note mentions is invisible to radius. Auto-merge on quiet **and** passing tests, never on quiet
+  alone.
 </Callout>
 
 ### A project in a subfolder
@@ -132,9 +131,8 @@ the repository settings.
 
 ## Good to know
 
-- **Dependabot and forks.** GitHub gives pull requests from Dependabot and from forks a read-only
-  token, so the comment can't be posted. The Action says so in a warning, doesn't fail, and the
-  brief is still in the job summary.
+- **Dependabot and forks.** GitHub gives these pull requests a read-only token, so the comment can't
+  be posted. The Action shows a warning, doesn't fail, and the result is still in the job summary.
 - **Pinning.** `@v0` follows every 0.x release. To pin exactly, use a full tag like `@v0.2.0`, or
   set `version`.
 - **Node.js.** If the runner's Node is older than 22.18, the Action sets up Node 24 for its own

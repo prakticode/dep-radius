@@ -1,91 +1,146 @@
 ---
 title: FAQ
-description: The questions people ask before trusting a tool with their upgrades.
+description: Short answers to the common questions about radius.
 icon: MessagesSquare
 ---
 
 <Accordions type="single">
+<Accordion title="Is radius an AI?">
+
+No. It reads your code with the TypeScript parser, compares the type files of two versions, and
+splits release notes into entries. For the same project and versions, it always gives the same
+answer. It's made to be used **by** AI agents. See [For AI agents](/docs/agents).
+
+</Accordion>
+<Accordion title="Why not let my AI agent read the changelog?">
+
+It can. But the agent guesses which files a note affects, and it often misses code that uses the
+package through another file. Ask again and you may get a different answer. It also can't tell you
+what it didn't check.
+
+radius finds every place your code uses the package, gives the same answer every time, and lists
+what it couldn't check. The agent then reads only those lines.
+
+</Accordion>
+<Accordion title="Which agents can use it?">
+
+Any agent that can run a command and read JSON: Claude Code, Cursor, GitHub Copilot, Codex, Aider, or
+your own. The [agent guide](/docs/agents) has the instructions to paste.
+
+</Accordion>
 <Accordion title="Does radius run my code, or install anything?">
 
-No. It reads your files and parses them. Package tarballs are downloaded and read in memory: only
-their `package.json`, type declarations and changelog. No install, no lifecycle scripts, nothing
-from the packages ever runs.
+No. It reads your files. It downloads the two versions of each package and reads their
+`package.json`, type files and changelog in memory. Nothing is installed. Nothing from the package
+runs.
 
 </Accordion>
 <Accordion title="Does my code leave my machine?">
 
-No. radius talks to your npm registry, to `api.github.com` and to `raw.githubusercontent.com`, only
-to fetch package metadata and release notes. See
-[what leaves your machine](/docs/how-it-works#what-leaves-your-machine).
-
-</Accordion>
-<Accordion title="Is it an AI tool?">
-
-No, and that's on purpose. It's deterministic: the same inputs give the same verdicts, and every
-verdict comes with the rule that produced it. It's built to be **used by** AI agents, which is a
-different thing. See [For AI agents](/docs/agents).
+No. radius only talks to your npm registry, `api.github.com` and `raw.githubusercontent.com`, to get
+information about packages. See [what leaves your machine](/docs/how-it-works#what-leaves-your-machine).
 
 </Accordion>
 <Accordion title="Does it replace Renovate or Dependabot?">
 
-No, it completes them. They notice updates and open pull requests. radius tells you which of those
-pull requests you need to read. The [GitHub Action](/docs/github-action) puts the answer right on
-the pull request.
+No, it works with them. They tell you an update exists and open a pull request. radius tells you
+which changes in that update affect your code, and where. The [GitHub Action](/docs/github-action)
+posts that on their pull request.
+
+</Accordion>
+<Accordion title="What can it miss?">
+
+Two things:
+
+- **A change nobody wrote in the notes.** radius can't know about it. Your tests can.
+- **A change it can't link to your code.** Then it says review instead of quiet, but it can't point at
+  the exact line.
+
+On the [benchmark](/docs/benchmark) of 51 real changes, radius found the exact line for 24. It called
+none of them quiet.
+
+</Accordion>
+<Accordion title="Why does almost every update get review?">
+
+Most releases include a fix written in plain words, like "Fix handling of empty values". radius can't
+prove that fix doesn't affect your code, so it shows it to you. You read a few lines, not the whole
+changelog.
+
+On 451 real upgrades from three open source projects, about one in ten was quiet.
 
 </Accordion>
 <Accordion title="If it says quiet, can I skip my tests?">
 
-Please don't. Quiet means nothing you use changed according to the types and the release notes. A
-behaviour change nobody wrote down is invisible to any tool that reads notes. Quiet plus green
-tests is the combination to trust.
+No. Quiet means nothing your code uses changed, according to the types and the release notes. A
+change nobody wrote down is still possible. Trust quiet and green tests together.
+
+</Accordion>
+<Accordion title="How long does it take?">
+
+The first run downloads what it needs for each updated package. After that, everything comes from
+the cache, and a run takes about as long as reading your files. `--since` doesn't need anything
+installed.
+
+</Accordion>
+<Accordion title="Is radius itself safe to install?">
+
+- It has three direct dependencies: `typescript`, `semver` and `@clack/prompts`.
+- It has no install scripts.
+- Each release is published from GitHub Actions with npm provenance, which links it to its source.
+- It sends no telemetry.
+- The code is open source, MIT, [on GitHub](https://github.com/prakticode/dep-radius).
+
+</Accordion>
+<Accordion title="Can I build on the JSON output?">
+
+Yes. The JSON has a version, `schemaVersion: 1`. Version 1 only adds fields. Removing or renaming a
+field would mean version 2. The command itself is still 0.x, so options may change; every change is
+in the changelog.
 
 </Accordion>
 <Accordion title="Which projects does it support?">
 
-JavaScript and TypeScript projects with npm, pnpm, Yarn (classic, berry, Plug'n'Play) or Bun. One
-`package.json` or a monorepo with many. Plain JavaScript works too: without types, radius relies on
-the release notes, and says so.
+JavaScript and TypeScript projects using npm, pnpm, Yarn (classic, berry, Plug'n'Play) or Bun. One
+`package.json` or a monorepo with many. Plain JavaScript works too: without types, radius uses the
+release notes only, and says so.
 
 </Accordion>
 <Accordion title="My monorepo has 30 packages. Do I run it 30 times?">
 
-No. Run it at the root: every `package.json` is read, and each installed version of a dependency is
-briefed once, with the manifests that declare it. To focus on one package, pass its folder: `radius ./packages/api`.
+No. Run it once at the root. It reads every `package.json`. To look at one package, pass its folder:
+`radius ./packages/api`.
 
 </Accordion>
-<Accordion title="Private registries?">
+<Accordion title="Does it work with private registries?">
 
-Yes. radius reads the registry, scoped registries and `_authToken` entries from your `.npmrc`, just
-like npm. Release notes still come from GitHub, when the package points to a GitHub repository.
-
-</Accordion>
-<Accordion title="Why is a package I don't touch marked review?">
-
-Usually because radius can't see how it's used: it's run from a script (`eslint`), named in a
-config file (a Babel plugin), or it's a framework used through file conventions (`next`). Those are
-listed under "cannot see how you use these". See [what radius cannot see](/docs/blind-spots).
-
-Or a release note describes a change radius can't tie to your code, like "Fix handling of empty
-values". radius shows those notes: read the few lines, and if none concerns you, merge.
+Yes. radius reads your registries and tokens from `.npmrc`, like npm does. Release notes still come
+from GitHub, when the package links to a GitHub repository.
 
 </Accordion>
-<Accordion title="Why is the version it proposes not the latest one?">
+<Accordion title="Why is a package I don't use in my code marked review?">
 
-By default radius stays on your version's line (same major), skips versions younger than a day, and
-never goes above the `latest` tag. Newer majors show up as "also available". Use `--latest`, or
-`package@version`, to analyse something else.
+Usually because radius can't see how it's used. For example, it runs from a script (`eslint`), it's
+named in a config file (a Babel plugin), or it's a framework that works through file names (`next`).
+These are listed under "cannot see how you use these". See [what radius cannot see](/docs/blind-spots).
+
+</Accordion>
+<Accordion title="Why isn't it checking the latest version?">
+
+By default, radius stays on your major version, skips versions published less than a day ago, and
+never goes past the `latest` tag. Newer majors show up as "also available". Use `--latest`, or
+`package@version`, to check something else.
 
 </Accordion>
 <Accordion title="radius said quiet and it was wrong. What now?">
 
-That's the bug that matters most, so thank you in advance: please
-[open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose) with the
-package, the two versions and what broke.
+Please [open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose) with
+the package, the two versions and what broke. It's the most useful report there is.
 
 </Accordion>
 <Accordion title="How much does it cost?">
 
-Nothing. The CLI, the engine and the GitHub Action are open source under the MIT license.
+Nothing. The command, the library and the GitHub Action are free and open source, under the MIT
+license.
 
 </Accordion>
 </Accordions>

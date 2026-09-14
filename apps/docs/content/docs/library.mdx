@@ -4,8 +4,8 @@ description: "@dep-radius/core: the engine behind the CLI and the Action, for yo
 icon: Package
 ---
 
-The CLI and the GitHub Action are thin shells around one library, `@dep-radius/core`. If you're
-building your own integration (a bot, a dashboard, an MCP server), you can call it directly.
+The command and the GitHub Action both use one library, `@dep-radius/core`. To build your own tool (a
+bot, a dashboard, an MCP server), call it directly.
 
 ```npm
 npm install @dep-radius/core
@@ -13,7 +13,7 @@ npm install @dep-radius/core
 
 <Callout type="warn" title="0.x: the JSON is the stable part">
   The JavaScript API may still move between minor versions while radius is in 0.x. The
-  [JSON brief](/docs/json) is the contract that doesn't. If you only need the result, running
+  [JSON output](/docs/json) is the contract that doesn't. If you only need the result, running
   `npx dep-radius --json` and parsing it is the most future-proof option.
 </Callout>
 
@@ -62,7 +62,7 @@ console.log(renderMarkdown(brief, options.now)) // the pull request comment
 | `run(options, ctx, onEvent?)`         | Analyse a project, resolves to a `Brief`                            |
 | `createCtx(options, http?)`           | The cache, network limits and GitHub token lookup `run` needs       |
 | `defaultCacheDir(env)`                | The platform cache folder                                           |
-| `toJsonV1(brief)`, `renderJson(brief)` | The JSON brief, as an object or a string                           |
+| `toJsonV1(brief)`, `renderJson(brief)` | The JSON output, as an object or a string                           |
 | `renderMarkdown(brief, now)`          | The pull request comment                                            |
 | `parseSpec("zod@4.6.0")`              | `{ name, version }`                                                 |
 | `parseDuration("7d")`                 | Milliseconds                                                        |

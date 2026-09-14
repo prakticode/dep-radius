@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: `${appName}: ${tagline}`, template: `%s | ${appName}` },
   description:
-    "radius tells you, and your AI agent, which changes in a dependency update land on code you actually wrote. Quiet, review or blocked, with the exact lines.",
+    "radius tells your AI agent which changes in a dependency upgrade affect your code, with the files and lines to check. No AI inside, and your code stays on your machine.",
 }
 
 export default function Layout({ children }: LayoutProps<"/">) {

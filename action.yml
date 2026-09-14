@@ -1,5 +1,5 @@
 name: dep-radius
-description: Which changes in a dependency update land on your code. One comment on every pull request that changes a dependency.
+description: A comment on every pull request that changes a dependency, with the changes that affect your code and the lines to check.
 author: prakticode
 branding:
   icon: target

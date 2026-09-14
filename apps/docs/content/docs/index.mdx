@@ -1,73 +1,78 @@
 ---
 title: Introduction
-description: Which changes in a dependency update land on code you actually wrote. In one command.
+description: radius tells your AI agent which changes in a dependency upgrade affect your code, with the files and lines.
 icon: Target
 ---
 
-A dependency update comes in. Maybe Renovate opened it, maybe Dependabot, maybe your AI agent just
-ran `pnpm up`. The changelog is 40 entries long. Which of them matter to **you**?
+## The problem
 
-That's the only question radius answers. It reads your project, compares the update's types and
-release notes with the code that uses the package, and gives you one of three words:
+Your agent upgrades `zod` from 4.4.3 to 4.5.0.
 
-| Verdict     | Means                                                     | Exit code |
-| ----------- | --------------------------------------------------------- | --------- |
-| **quiet**   | Nothing you use changed, and no note mentions it.         | `0`       |
-| **review**  | Here are the exact lines concerned, or what radius can't see. | `1`       |
-| **blocked** | An export you call was removed.                           | `2`       |
+- The code compiles.
+- The tests pass.
+- The agent says it's done.
+
+But the release notes say: "`.min()` now counts an emoji as one character." Your feedback form uses
+`z.string().min(10)`. A message with five emoji used to pass. Now it's rejected.
+
+Nothing failed, because nothing checked the release notes against your code.
+
+## What radius does
+
+After an upgrade, radius:
+
+1. Reads the release notes of every version in between.
+2. Compares the type files of the old and new versions.
+3. Finds every place your code uses the package.
+4. Tells you which changes affect your code, and on which lines.
 
 ```sh
-npx dep-radius
+npx dep-radius --since HEAD --json
 ```
 
-No account, no config file, no build step. Any package manager, one `package.json` or fifty,
-TypeScript or plain JavaScript.
-
-## What it looks like
+For the zod upgrade, it prints:
 
 ```txt
-schemakit  3.1.4 → 3.2.0  minor  published 3d ago   REVIEW
-  surface changes ......... 12
-  changes you touch ....... 0
-  notes mentioning you .... 1  of 18, notes for 1/1 versions (github-release)
-
-  3.2.0  The email pattern no longer accepts quoted local parts
-    you use: email
-    src/signup/schema.ts:14
-    src/billing/contact.ts:9  (via src/lib/validation.ts)
-
-38 with an update  31 quiet · 7 review · 0 blocked  · 12 up to date
+zod  4.4.3 → 4.5.0  minor   REVIEW
+  4.5.0  ⚠️ String length counts code points
+    you use: string, max, min
+    src/feedback/schema.ts:5  (via src/lib/zod.ts)
 ```
 
-Out of 18 release notes, one mentions something this project uses, and radius shows the two lines
-where it's used, even the one that goes through a local re-export file. The other 31 updates are
-quiet: nothing to read.
+This is real output, shortened. radius found the line even though the file imports zod through
+another file, `src/lib/zod.ts`.
 
-## Made for agents, pleasant for humans
+## The three answers
 
-AI agents are great at upgrading dependencies and terrible at reading 40 changelogs cheaply. radius
-gives them a stable `--json` brief, honest exit codes, and a `--since` mode for "I just bumped
-things, what did I break?". Humans get the same brief as a terminal report or a pull request
-comment.
+| Answer      | Means                                                                   | Exit code |
+| ----------- | ----------------------------------------------------------------------- | --------- |
+| **quiet**   | Nothing your code uses changed. You can merge.                          | `0`       |
+| **review**  | Some changes may affect your code. Here are the lines to check.         | `1`       |
+| **blocked** | Something your code calls was removed. Here is every place that calls it. | `2`       |
+
+Quiet is rare: about one update in ten. If radius can't prove an update is safe, it says review.
+
+## Where to use it
 
 <Cards>
-  <Card title="Quickstart" href="/docs/quickstart">
-    Run it on your project in under a minute.
+  <Card title="In your AI agent" href="/docs/agents">
+    The instructions to paste into CLAUDE.md or AGENTS.md.
   </Card>
-  <Card title="For AI agents" href="/docs/agents">
-    The loop, the JSON, and a snippet for your AGENTS.md.
+  <Card title="On pull requests" href="/docs/github-action">
+    A comment on each Renovate or Dependabot pull request.
   </Card>
-  <Card title="GitHub Action" href="/docs/github-action">
-    One comment on every pull request that changes a dependency.
+  <Card title="In your terminal" href="/docs/quickstart">
+    Run `npx dep-radius` in your project.
   </Card>
-  <Card title="How it decides" href="/docs/verdicts">
-    Quiet, review, blocked, and why "quiet" is hard to earn.
+  <Card title="Does it work?" href="/docs/benchmark">
+    Tested on 51 real release notes, with every miss listed.
   </Card>
 </Cards>
 
-## The one promise
+## What radius is not
 
-A wrong **quiet** is the only bug that really hurts, so radius is built to avoid it. Anything it
-can't see (a package used only from a script, a config string, a name passed around whole) pushes
-the verdict towards **review**, never towards quiet. When in doubt, it tells you what it couldn't
-see.
+- **It doesn't replace your tests.** It only knows what the release notes say.
+- **It doesn't replace Renovate or Dependabot.** They tell you an update exists. radius tells you
+  what it changes for your code.
+- **It isn't an AI.** It gives the same answer every time for the same project and versions.
+- **It doesn't send your code anywhere.** It only downloads information about packages.

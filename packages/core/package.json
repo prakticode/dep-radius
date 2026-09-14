@@ -1,7 +1,7 @@
 {
   "name": "@dep-radius/core",
   "version": "0.4.0",
-  "description": "The engine behind radius: which changes in a dependency update land on code you actually wrote.",
+  "description": "The library behind dep-radius: which changes in a dependency upgrade affect your code, and on which lines.",
   "license": "MIT",
   "author": "prakticode",
   "homepage": "https://depradius.com/docs/library",
@@ -24,7 +24,12 @@
     "breaking-changes",
     "typescript",
     "library",
-    "static-analysis"
+    "static-analysis",
+    "ai-agents",
+    "claude-code",
+    "coding-agent",
+    "agents-md",
+    "behaviour-change"
   ],
   "type": "module",
   "exports": {

@@ -1,14 +1,14 @@
 ---
 title: What radius cannot see
-description: Every blind spot, in plain words, and what to do about it. Honesty beats a green checkmark.
+description: What radius cannot see, and what to do about it.
 icon: EyeOff
 ---
 
-Reading names in code gets you far, but not everywhere. When radius can't see how a package is used,
-it says so, and the update goes to **review** instead of quiet. In the brief, these show up under
-"cannot see how you use these", and in JSON under `usage.cannotSee`.
+Sometimes radius can't see how your code uses a package. Then it says so, and the update gets
+**review** instead of quiet. In the terminal, these are under "cannot see how you use these". In
+JSON, they're in `usage.cannotSee`.
 
-## Used in ways names can't show
+## Used without a name in your code
 
 | Kind                   | In plain words                                  | Typical example                          |
 | ---------------------- | ----------------------------------------------- | ---------------------------------------- |
@@ -19,9 +19,9 @@ it says so, and the update goes to **review** instead of quiet. In the brief, th
 | `convention-framework` | a framework used through file conventions       | `next`, with its `app/` folder           |
 | `ambient-types`        | types that apply globally                       | `@types/node`                            |
 
-For these, radius can't know which part of the package you rely on. Your build and your tests can.
+radius can't know which part of the package you rely on here. Your build and tests can.
 
-## Usage radius couldn't follow
+## Usage radius can't follow
 
 | Kind                         | In plain words                                         |
 | ---------------------------- | ------------------------------------------------------ |
@@ -37,24 +37,24 @@ For these, radius can't know which part of the package you rely on. Your build a
 
 ## For the whole project
 
-Some things hide usage everywhere at once, so they're reported once, at the top of the brief (and in
-JSON under `wholeProject`), without downgrading every package:
+Some things hide usage across the whole project. They're reported once, at the top (in JSON:
+`wholeProject`), without changing every package's answer:
 
 - `require(someVariable)` and `import(someVariable)` with a non-literal name,
 - generated files that were skipped,
 - files that didn't parse.
 
-## The limits, stated plainly
+## Limits
 
-- **Behaviour changes are only seen through release notes.** If a function keeps its signature but
-  does something different, and no note says so, radius can't know.
-- **No type checker runs over your code.** A member reached through a callback or a value from
-  somewhere radius didn't follow is matched by name only ("possibly").
-- **A local name that shadows an import** isn't analysed.
-- **Types that re-export another package's types** are judged from the notes only.
-- **Release notes come from GitHub** and the package's own changelog. Other forges aren't read yet.
-- **Transitive dependencies are out of scope.** Your lockfile and an install cooldown own that risk.
+- **radius only knows what release notes say.** If a function works differently and no note says so,
+  radius can't know.
+- **It doesn't type-check your code.** A member used through a callback, or through a value radius
+  didn't follow, is matched by name only ("possibly").
+- **A local variable with the same name as an import** isn't analysed.
+- **A package whose types come from another package** is judged from its notes only.
+- **Release notes come from GitHub** and the package's own changelog. GitLab and others aren't read
+  yet.
+- **Dependencies of your dependencies aren't checked.** Your lockfile handles that.
 
-Each brief lists the limits that applied to that run, so nothing here is a surprise later.
-[The behaviour change benchmark](/docs/benchmark) measures what these limits cost on real release
-notes, case by case.
+Every run lists the limits that applied. [The benchmark](/docs/benchmark) shows what these limits
+cost on real release notes.

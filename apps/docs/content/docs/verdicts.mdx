@@ -1,85 +1,86 @@
 ---
 title: Quiet, review, blocked
-description: What each verdict means, what earns it, and why quiet is the hardest one to get.
+description: What each answer means, and when radius gives it.
 icon: Scale
 ---
 
-Every analysed update gets exactly one verdict. Rules are checked in order, and **every rule that
-fires is kept** in `reasons`, so you always know why.
+For each updated package, radius gives one answer. It also lists every reason behind it, in
+`reasons`.
 
 ## Blocked
 
-**An export your code uses was removed.** The types were compared, and something your code imports,
-calls or references (even only as a type) no longer exists in the new version.
+**Something your code uses was removed.**
 
-This is the only rule that blocks. It's a strong signal: the code most likely won't compile.
+radius compared the type files of the two versions. A function, class or type your code uses is gone
+in the new version. Your code most likely won't compile.
 
 ## Review
 
-Any one of these is enough:
+**Some changes may affect your code.** Any one of these is enough:
 
-**Changes land on your usage**
+**A change lands on your code**
 
-- A signature you use changed, or became deprecated.
-- A member you might reach by name changed (radius couldn't resolve it precisely, so it says
-  "possibly").
+- A function or type you use changed, or is now deprecated.
+- A member you might use changed. radius matched it by name only, so it says "possibly".
 
-**The release notes mention you**
+**A release note concerns you**
 
 - A note names something you use.
-- A breaking note names no API at all, so it could be about anyone, including you.
-- A note describes a change radius can't tie to your code: "Remove empty non-boolean attributes",
-  or a fix naming an option it can't see. Radius lists them; each is a line to read, not a whole
-  changelog.
+- A breaking note names nothing specific, so it could apply to you.
+- A note describes a change radius can't link to your code, like "Remove empty non-boolean
+  attributes". radius lists these notes, so you can read them.
 
-**radius can't fully see how you use the package**
+**radius can't see how you use the package**
 
-- It's used from a script, a config file, CSS, or only for side effects.
-- It's passed around whole, read with computed keys, or reached through files that didn't parse.
-- No scanned file uses it at all.
+- It's used from a script, a config file, CSS, or only imported for side effects.
+- It's passed around whole, used with computed names, or used in a file that didn't parse.
+- No file uses it.
 - The installed copy is patched, isn't on the registry, or its version had to be guessed.
 
-**The evidence is missing**
+**Information is missing**
 
-- The types couldn't be compared and the notes aren't complete either.
-- It's a major (or a `0.x` minor), and the two nets aren't both complete and clean.
+- The types couldn't be compared, and some release notes are missing too.
+- It's a major version (or a `0.x` minor), and radius couldn't fully check both the types and the
+  notes.
 
 ## Quiet
 
-Everything else. Concretely, for an update to be quiet:
+**Nothing your code uses changed.** For quiet, all of these must be true:
 
-- every name your code uses was found in the old types,
-- nothing radius can't see is in the way,
-- every release note that describes a change is accounted for: it names something you don't use,
-  or it's housekeeping (docs, tests, CI, dependency updates) or an addition (a new feature or
-  option),
-- and at least one net is complete with zero hits: all the release notes were read and none
-  mentions you, or the types were compared and nothing you use changed.
+- Every name your code uses was found.
+- Nothing is hidden from radius.
+- Every release note that describes a change is explained: it names something you don't use, or
+  it's housekeeping (docs, tests, CI, dependency updates), or it only adds something new.
+- The release notes were all read, or the types were compared.
 
-That third condition makes quiet rare. Most releases carry at least one fix written in plain words,
-and radius can't prove such a fix doesn't concern you, so it asks you to read that line.
+This is why quiet is rare. Most releases include a fix written in plain words. radius can't prove it
+doesn't affect you, so it says review and shows you the note.
 
 <Callout title="The asterisk">
-  A quiet verdict that stood on **one net only** (no types, or notes missing for some versions) is
-  marked with `*` in the terminal and "(one net)" in pull request comments. Still quiet, just
-  worth knowing.
+  A quiet that relied on only the types, or only the notes, is marked `*` in the terminal and "(one
+  net)" in pull request comments. It's still quiet.
 </Callout>
 
-## Why quiet is hard to earn
+## Why quiet is hard to get
 
-The only bug that really hurts is a wrong quiet: you merge without reading, and something breaks
-in production. So radius treats every blind spot as a reason to look, not as a reason to relax.
+A wrong quiet is the worst mistake: you merge without reading, and something breaks. So radius only
+says quiet when it can explain why.
 
-Before its first release, radius was backtested on 462 real dependency upgrades from four
-repositories: every update it would have called quiet was checked against what the project actually
-had to change. Zero wrong quiets. That backtest only sees breaks that forced a code change, though:
-[the behaviour change benchmark](/docs/benchmark) replays documented changes to code a project
-relies on. It found 13 upgrades radius called quiet, which led to the rule that every change note must be accounted for; none of its 51 upgrades is quiet now. Found one? Please
-[open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose), it's the
-most useful report there is.
+Two tests check this:
 
-## Several packages
+- **A backtest** replayed 462 past upgrades from four projects. No upgrade called quiet had to be
+  fixed afterwards. But this test only catches changes that forced a code fix.
+- **The [behaviour change benchmark](/docs/benchmark)** uses 51 real release notes that changed
+  behaviour. It found 13 upgrades radius called quiet by mistake. The rule above fixed them: none of
+  the 51 is quiet now.
 
-The run's exit code is the worst verdict: `2` if anything is blocked, else `1` if anything needs
-review, else `0`. A package radius can't analyse (a registry error, a version that doesn't exist, a
-dependency installed from git) is listed under "not analysed" with the reason, and the others go on.
+Found a wrong quiet? Please
+[open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose).
+
+## Several packages at once
+
+The exit code is the worst answer across all packages: `2` if one is blocked, else `1` if one needs
+review, else `0`.
+
+If radius can't check a package (a registry error, a version that doesn't exist, a package installed
+from git), it lists it under "not analysed" with the reason, and checks the others.
