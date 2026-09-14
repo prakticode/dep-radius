@@ -1,0 +1,19 @@
+{
+  "package": "knex",
+  "from": "3.1.0",
+  "to": "3.2.0",
+  "repository": "https://github.com/knex/knex",
+  "sources": {
+    "3.2.0": "https://github.com/knex/knex/blob/master/CHANGELOG.md"
+  },
+  "change": [
+    "Prevent unexpected combinations of statements and clauses groups from executing"
+  ],
+  "why": "A delete with limit() now throws \"limit has no effect on a delete statement\" on PostgreSQL instead of silently dropping the limit, so the batched session purge fails on every run.",
+  "expect": [
+    "src/jobs/purge-sessions.js:4",
+    "src/jobs/purge-sessions.js:6",
+    "src/jobs/purge-sessions.js:7"
+  ],
+  "status": "missed"
+}

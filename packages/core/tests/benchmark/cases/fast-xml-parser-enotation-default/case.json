@@ -1,0 +1,18 @@
+{
+  "package": "fast-xml-parser",
+  "from": "4.0.15",
+  "to": "4.1.0",
+  "repository": "https://github.com/NaturalIntelligence/fast-xml-parser",
+  "sources": {
+    "4.1.0": "https://github.com/NaturalIntelligence/fast-xml-parser/blob/master/CHANGELOG.md"
+  },
+  "change": [
+    "Set \"eNotation\" to 'true' as default"
+  ],
+  "why": "Tag values that look like scientific notation are now parsed as numbers, so a SKU such as 12E4 comes back as 120000 instead of the string \"12E4\".",
+  "expect": [
+    "src/feeds/catalog.js:3",
+    "src/feeds/catalog.js:6"
+  ],
+  "status": "missed"
+}

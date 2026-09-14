@@ -1,0 +1,17 @@
+{
+  "package": "jose",
+  "from": "5.10.0",
+  "to": "6.0.0",
+  "repository": "https://github.com/panva/jose",
+  "sources": {
+    "6.0.0": "https://github.com/panva/jose/blob/main/CHANGELOG.md#600-2025-02-22"
+  },
+  "change": [
+    "private KeyObject instances can no longer be used for verify operations"
+  ],
+  "why": "jwtVerify() rejects the private KeyObject with a TypeError, so every token the service issued fails verification and all authenticated requests are refused.",
+  "expect": [
+    "src/auth/tokens.js:15"
+  ],
+  "status": "missed"
+}

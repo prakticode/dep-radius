@@ -1,0 +1,18 @@
+{
+  "package": "yup",
+  "from": "1.1.0",
+  "to": "1.1.1",
+  "repository": "https://github.com/jquense/yup",
+  "sources": {
+    "1.1.1": "https://github.com/jquense/yup/blob/master/CHANGELOG.md"
+  },
+  "change": [
+    "make null validation errors consistent across schema"
+  ],
+  "why": "A null age or birthday no longer fails with the custom typeError message; the form shows \"age cannot be null\" and \"birthday cannot be null\" instead of \"Enter your age in years\" and \"Enter a valid date\".",
+  "expect": [
+    "src/profile/validateProfile.ts:5",
+    "src/profile/validateProfile.ts:6"
+  ],
+  "status": "missed"
+}

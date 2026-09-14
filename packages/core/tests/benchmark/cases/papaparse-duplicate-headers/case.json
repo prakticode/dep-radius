@@ -1,0 +1,17 @@
+{
+  "package": "papaparse",
+  "from": "5.3.2",
+  "to": "5.4.0",
+  "repository": "https://github.com/mholt/PapaParse",
+  "sources": {
+    "5.4.0": "https://github.com/mholt/PapaParse/releases/tag/5.4.0"
+  },
+  "change": [
+    "Rename duplicate headers"
+  ],
+  "why": "With header: true, a repeated column name is now renamed to price_1 instead of overwriting the first one, so row.price holds the first column's value where it used to hold the last.",
+  "expect": [
+    "src/uploads/price-list.js:4"
+  ],
+  "status": "missed"
+}

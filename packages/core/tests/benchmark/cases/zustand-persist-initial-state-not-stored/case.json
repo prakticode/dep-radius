@@ -1,0 +1,18 @@
+{
+  "package": "zustand",
+  "from": "4.5.4",
+  "to": "4.5.5",
+  "repository": "https://github.com/pmndrs/zustand",
+  "sources": {
+    "4.5.5": "https://github.com/pmndrs/zustand/releases/tag/v4.5.5"
+  },
+  "change": [
+    "avoid calling setItem with the state just retrieved"
+  ],
+  "why": "The persisted store no longer writes its initial state to localStorage on creation, so the generated device id is never saved and a new one is created on every page load until something calls set.",
+  "expect": [
+    "src/stores/useDeviceId.ts:4",
+    "src/stores/useDeviceId.ts:5"
+  ],
+  "status": "missed"
+}

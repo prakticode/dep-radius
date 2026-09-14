@@ -1,0 +1,18 @@
+{
+  "package": "rxjs",
+  "from": "7.8.0",
+  "to": "7.8.1",
+  "repository": "https://github.com/ReactiveX/rxjs",
+  "sources": {
+    "7.8.1": "https://github.com/ReactiveX/rxjs/blob/7.x/CHANGELOG.md"
+  },
+  "change": [
+    "properly handle default ThrottleConfig values"
+  ],
+  "why": "With only { trailing: true } passed, leading now defaults to true instead of false, so the first keystroke fires a search request immediately instead of waiting 500 ms.",
+  "expect": [
+    "src/search/searchAsYouType.ts:5",
+    "src/search/searchAsYouType.ts:8"
+  ],
+  "status": "missed"
+}
