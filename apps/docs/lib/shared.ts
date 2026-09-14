@@ -1,7 +1,7 @@
 import { createGetUrl } from "fumadocs-core/source"
 
 export const appName = "dep-radius"
-export const tagline = "Know which dependency updates touch your code"
+export const tagline = "what a dependency upgrade changes for your code"
 export const docsRoute = "/docs"
 export const docsImageRoute = "/og/docs"
 export const docsContentRoute = "/llms.mdx/docs"

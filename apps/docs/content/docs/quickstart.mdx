@@ -1,10 +1,10 @@
 ---
 title: Quickstart
-description: From zero to your first brief in under a minute.
+description: Run radius on your project in under a minute.
 icon: Rocket
 ---
 
-You need **Node.js 22.12 or later** and a JavaScript or TypeScript project. That's it.
+You need **Node.js 22.12 or later** and a JavaScript or TypeScript project.
 
 <Steps>
 <Step>
@@ -16,19 +16,17 @@ cd your-project
 npx dep-radius
 ```
 
-radius finds every direct dependency with an update waiting, and briefs each one. The first run
-downloads package metadata and release notes. Later runs come mostly from the cache and are fast.
+radius checks every dependency that has an update. The first run downloads what it needs. Later runs
+use the cache and are fast.
 
 </Step>
 <Step>
 
-### Read the verdicts
+### Read the answers
 
-Quiet updates are listed on one line: you can merge them without reading. Each **review** or
-**blocked** package gets a short block with the lines of your code that are concerned, and the
-release notes that mention what you use. The block starts with what breaks and is tied to your code
-(a removed export, a breaking note naming what you use), and ends with what is only "possibly" about
-it, so the top of each block is what to read first.
+- **Quiet** packages are listed on one line. You can merge them.
+- **Review** and **blocked** packages each get a short block: the release notes that affect your
+  code, and your lines. The most important ones come first.
 
 </Step>
 <Step>
@@ -46,21 +44,21 @@ npx dep-radius --latest       # the newest version, even across majors
 
 ### Already upgraded? Ask what changed
 
-Ran `npm update` or merged a bot's lockfile change? Compare with a commit instead of the registry:
+Ran `npm update`, or merged a bot's pull request? Compare with a commit:
 
 ```sh
 npx dep-radius --since HEAD   # changes not committed yet
 npx dep-radius --since main   # everything this branch changed
 ```
 
-`--since` needs nothing installed: it reads the versions from the lockfile at that commit.
+`--since` doesn't need anything installed. It reads the lockfile at that commit.
 
 </Step>
 </Steps>
 
 ## Install it for good (optional)
 
-`npx` is fine for most people. If you run it a lot:
+`npx` is enough. If you run it often:
 
 ```npm
 npm install --save-dev dep-radius
@@ -70,8 +68,8 @@ Then use `radius` (or `dep-radius`, same thing) in your scripts.
 
 ## Give it a GitHub token (recommended)
 
-Release notes mostly come from GitHub, which allows 60 requests an hour without a token. radius
-picks up `GITHUB_TOKEN`, `GH_TOKEN`, or your `gh` login automatically, which lifts that to 5000.
+Release notes mostly come from GitHub. Without a token, GitHub allows 60 requests an hour. With one,
+5000. radius finds `GITHUB_TOKEN`, `GH_TOKEN`, or your `gh` login by itself.
 
 ```sh
 gh auth login   # once, and radius finds it
@@ -81,13 +79,13 @@ gh auth login   # once, and radius finds it
 
 | Code | Verdict                                  |
 | ---- | ---------------------------------------- |
-| `0`  | quiet: everything is quiet               |
+| `0`  | quiet: nothing your code uses changed    |
 | `1`  | review: at least one package needs a look |
 | `2`  | blocked: an export you use was removed   |
 | `3`  | radius itself failed (bad option, no git history for `--since`) |
 
-The code is the worst verdict across packages, so `npx dep-radius zod && npm run deploy` does
-what you'd hope.
+The exit code is the worst answer across all packages. So `npx dep-radius zod && npm run deploy` only
+deploys when zod is quiet.
 
 ## Next
 

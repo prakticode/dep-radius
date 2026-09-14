@@ -1,20 +1,19 @@
 ---
-title: The JSON brief
-description: "The --json output, field by field. A stable contract: version 1 only ever gains fields."
+title: The JSON output
+description: "The --json output, field by field. Version 1 only adds fields."
 icon: Braces
 ---
 
-`radius --json` prints one JSON object on stdout. It's the same brief as the terminal report and the
-pull request comment, just shaped for programs.
+`radius --json` prints one JSON object. It has the same content as the terminal output and the pull
+request comment.
 
-## The stability promise
+## Will it change?
 
-- The object carries `"schemaVersion": 1`.
-- Version 1 **only gains fields**. Removing or renaming one would mean `schemaVersion: 2`.
-- A JSON Schema ships with the engine: `@dep-radius/core/schema/brief-v1.schema.json`. You can
-  validate against it, or just read it.
+- The object has `"schemaVersion": 1`.
+- Version 1 **only adds fields**. Removing or renaming a field would mean `schemaVersion: 2`.
+- The JSON Schema is included: `@dep-radius/core/schema/brief-v1.schema.json`.
 
-So: read the fields you need, ignore the ones you don't know, and your integration keeps working.
+Read the fields you need and ignore the others. Your code will keep working.
 
 ## The top level
 

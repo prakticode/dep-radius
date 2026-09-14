@@ -1,7 +1,7 @@
 {
   "name": "dep-radius",
   "version": "0.4.0",
-  "description": "Tells you which changes in a dependency update land on code you actually wrote.",
+  "description": "Tells your AI agent which changes in a dependency upgrade affect your code, with the files and lines to check.",
   "license": "MIT",
   "author": "prakticode",
   "homepage": "https://depradius.com",
@@ -23,7 +23,12 @@
     "dependabot",
     "breaking-changes",
     "typescript",
-    "cli"
+    "cli",
+    "ai-agents",
+    "claude-code",
+    "coding-agent",
+    "agents-md",
+    "behaviour-change"
   ],
   "type": "module",
   "bin": {

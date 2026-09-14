@@ -1,146 +1,212 @@
 ---
 title: Use radius from an AI agent
-description: Two relevant lines instead of forty changelogs. The loop, the commands, and a snippet to paste into AGENTS.md.
+description: What your agent should run after a dependency upgrade, and what to do with the result.
 icon: Bot
 ---
 
-An agent that upgrades a dependency usually does one of two things: it skips the changelog and
-hopes, or it reads every release note and burns thousands of tokens on emoji fixes and CI tweaks.
-radius is the middle path. It reads the notes and the types **against your code**, and hands the
-agent only what lands on it, as JSON, with a file and a line for each finding.
+## Why your agent needs it
 
-## The loop
+When an agent upgrades a dependency, it checks two things: does the code compile, and do the tests
+pass. Both can be fine while the package now behaves differently: a new default, a stricter check.
+
+Those changes are written in the release notes. The agent either skips the notes, or reads all of
+them and guesses which files they affect.
+
+radius does that part for it. It returns the changes that affect your code, with the files and lines.
+The agent then checks those lines and runs the tests.
+
+## The steps
 
 <Steps>
 <Step>
 
-### Change the versions
+### 1. Upgrade
 
-The agent runs the upgrade however the project does it: `pnpm up zod`, `npm install react@19`, or a
-manual edit plus an install.
+The agent upgrades the way the project does it: `pnpm up zod`, `npm install react@19`. No need to
+commit.
 
 </Step>
 <Step>
 
-### Ask radius what changed
+### 2. Run radius
 
 ```sh
 npx dep-radius --since HEAD --json
 ```
 
-`--since HEAD` compares the working tree with the last commit, so uncommitted upgrades are exactly
-what gets analysed. On a branch with several commits, use `--since main`.
+`--since HEAD` compares with the last commit, so radius looks at exactly what the agent just
+changed. On a branch with several commits, use `--since main`.
 
 </Step>
 <Step>
 
-### Act on the exit code
+### 3. Check the lines
 
-| Exit | The agent should                                                                  |
-| ---- | --------------------------------------------------------------------------------- |
-| `0`  | Carry on and run the tests as usual. Nothing it uses changed.                     |
-| `1`  | Open each site in `types.touched[].sites` and `notes.matched`, adapt, run radius again. |
-| `2`  | Fix every site of a `removed` change before finishing. The code will not compile as is. |
-| `3`  | Stop and report the error. Don't guess a verdict.                                 |
+| Exit code | What the agent does                                                          |
+| --------- | ---------------------------------------------------------------------------- |
+| `0`       | Nothing your code uses changed. Run the tests.                               |
+| `1`       | Open each line radius lists. Read the notes it couldn't place. Fix what breaks. |
+| `2`       | Same as `1`, and first fix every call to what was removed.                    |
+| `3`       | radius failed. Report it. Don't guess.                                        |
 
 </Step>
 <Step>
 
-### Run the tests
+### 4. Run the tests
 
-radius replaces reading changelogs, not running tests. A quiet brief plus green tests is the
-combination you can trust.
+Run the tests for the files radius listed. If a note describes something no test covers, add a
+test. radius shows where to look. The tests confirm the code still works.
 
 </Step>
 </Steps>
 
-## Paste this into AGENTS.md
+## Paste this into CLAUDE.md or AGENTS.md
 
-Works the same in `CLAUDE.md`, `.cursor/rules`, `.github/copilot-instructions.md`, or wherever your
-agent reads project instructions.
+It works in `CLAUDE.md` (Claude Code), `AGENTS.md`, `.cursor/rules`,
+`.github/copilot-instructions.md`, or any file your agent reads.
 
-```md title="AGENTS.md"
-## Dependency updates
+```md title="CLAUDE.md"
+## Dependency upgrades
 
-After changing any dependency version (package.json or the lockfile), run:
+After you change a dependency version, run this before you say you're done:
 
     npx dep-radius --since HEAD --json
 
-Then act on the exit code:
+Then look at the exit code:
 
-- 0 (quiet): nothing this project uses changed. Run the tests as usual.
-- 1 (review): for each package with "verdict": "review", read `reasons`, then open every
-  `types.touched[].sites[]` and every site named in `notes.matched[]` (look them up in
-  `usage.sitesByName`). Adapt the code where the change applies, then run radius again.
-- 2 (blocked): an export the code uses was removed. Fix every site listed under
-  `types.touched[]` with "change": "removed" before finishing.
-- 3: radius failed. Report the error instead of guessing.
+- 0: nothing this project uses changed. Run the tests.
+- 1 or 2: for each package where "verdict" is not "quiet":
+  1. If "verdict" is "blocked", first fix every site in `types.touched[]` where "change" is
+     "removed".
+  2. Open every site in `types.touched[].sites[]`.
+  3. For each note in `notes.matched[]`, find its names (`names[].name`) in `usage.sitesByName`,
+     open those sites, and check if the change in the note's `title` affects that code.
+  4. Read the titles in `notes.breakingWithoutApi[]` and `notes.changesWithoutApi[]`. radius could
+     not link them to the code. Search the code for what they describe.
+  5. Fix the code. Run the tests for the files you opened. Add a test if nothing covers the change.
+  6. Run radius again.
+- 3: radius failed. Report the error. Don't guess.
 
-Entries in `usage.cannotSee` are places radius could not follow (scripts, config files, names passed
-around). Check those by hand or with the tests. Never call an update safe from radius alone.
+`usage.cannotSee[]` lists usage radius could not follow, like scripts or config files. Check those
+with the tests. Never call an upgrade safe because of radius alone.
 ```
 
-## Reading the JSON quickly
+## How I use it
 
-The full shape is on [The JSON brief](/docs/json). Here it is trimmed to the fields an agent needs
-90% of the time:
+I don't run radius myself. The block above is in my projects' `CLAUDE.md`. When Claude Code upgrades
+a dependency, it runs radius, opens the lines, and runs the tests for those files. Then it tells me
+the upgrade is done.
+
+## Why not just let the agent read the changelog?
+
+|                                   | Agent reads the changelog         | Agent runs radius                            |
+| --------------------------------- | --------------------------------- | -------------------------------------------- |
+| Finds the files a change affects  | Guesses, often misses some        | Finds every place, even through other files  |
+| Same answer next time             | No                                | Yes                                          |
+| Says what it didn't check         | No                                | Yes                                          |
+| Tokens used                       | Every note of every version       | Only the result                              |
+
+The agent still reads. It just reads the right lines.
+
+## The JSON
+
+Here is what an agent needs from the output. This is a real run, zod 4.4.3 → 4.5.0, shortened. The
+full format is on [The JSON output](/docs/json).
 
 ```json
 {
   "schemaVersion": 1,
-  "exitCode": 2,
+  "exitCode": 1,
   "packages": [
     {
-      "name": "schemakit",
-      "from": "3.1.4",
-      "to": "4.0.0",
-      "verdict": "blocked",
-      "reasons": [{ "code": "removed-touched", "detail": "1 removed export you use: schemakit:legacy" }],
-      "types": {
-        "touched": [
+      "name": "zod",
+      "from": "4.4.3",
+      "to": "4.5.0",
+      "verdict": "review",
+      "reasons": [
+        { "code": "notes-match", "detail": "5 release notes mention names you use (4 by name in the text)" },
+        { "code": "unattributed-change", "detail": "23 release notes describe changes radius cannot tie to your code" }
+      ],
+      "notes": {
+        "matched": [
           {
-            "path": "schemakit:legacy",
-            "change": "removed",
-            "sites": [{ "file": "src/signup.ts", "line": 12, "column": 1, "typeOnly": false, "code": "legacy()" }]
+            "version": "4.5.0",
+            "title": "⚠️ String length counts code points",
+            "breaking": true,
+            "direct": true,
+            "names": [
+              { "name": "string", "certainty": "exact", "where": "inline-code" },
+              { "name": "max", "certainty": "by-name", "where": "inline-code" },
+              { "name": "min", "certainty": "by-name", "where": "inline-code" }
+            ]
           }
-        ]
+        ],
+        "changesWithoutApi": [{ "version": "4.5.0", "title": "Zod 4.5 is now available.", "refs": [] }]
+      },
+      "usage": {
+        "sitesByName": {
+          "min": [
+            {
+              "file": "src/feedback/schema.ts",
+              "line": 5,
+              "column": 12,
+              "typeOnly": false,
+              "code": "message: z.string().min(10).max(2000),",
+              "via": ["src/lib/zod.ts"]
+            }
+          ]
+        }
       }
     }
   ]
 }
 ```
 
-A few `jq` one-liners that come in handy:
+| Field                       | What it is                                                          |
+| --------------------------- | ------------------------------------------------------------------- |
+| `notes.matched`             | Notes that name something your code uses                            |
+| `usage.sitesByName`         | Where your code uses each name: file, line, and the code itself     |
+| `types.touched`             | Functions and types that changed or were removed, with where they're used |
+| `notes.changesWithoutApi`   | Notes radius couldn't link to your code. Skim them.                 |
+| `notes.breakingWithoutApi`  | Breaking notes that name nothing specific                           |
+
+`notes.changesWithoutApi` can be long. Some entries are just a release intro, like "Zod 4.5 is now
+available." It's a list to skim, not a list of problems.
+
+## Handy commands
+
+These use `jq`:
 
 ```sh
-# every file:line to look at
-npx dep-radius --since HEAD --json | jq -r '.packages[].types.touched[].sites[] | "\(.file):\(.line)"'
+# every file:line a note lands on, with the note
+npx dep-radius --since HEAD --json | jq -r '.packages[] as $p | $p.notes.matched[] as $n | $n.names[].name as $name | ($p.usage.sitesByName[$name] // [])[] | "\(.file):\(.line)  \($n.title)"' | sort -u
 
-# the release notes that mention what you use
-npx dep-radius --since HEAD --json | jq -r '.packages[].notes.matched[] | "\(.version)  \(.title)"'
+# the notes radius couldn't link to your code
+npx dep-radius --since HEAD --json | jq -r '.packages[] | .name as $pkg | (.notes.breakingWithoutApi + .notes.changesWithoutApi)[] | "\($pkg) \(.version)  \(.title)"'
 
-# only the packages that need attention
-npx dep-radius --json | jq '.packages[] | select(.verdict != "quiet") | {name, from, to, verdict}'
+# every use of a changed or removed function
+npx dep-radius --since HEAD --json | jq -r '.packages[].types.touched[]?.sites[] | "\(.file):\(.line)"'
+
+# only the packages that need a look
+npx dep-radius --json | jq -c '.packages[] | select(.verdict != "quiet") | {name, from, to, verdict}'
 ```
 
-## Tips for smooth agent runs
+## Tips
 
-- **Give it a token.** Set `GITHUB_TOKEN` (or be logged in with `gh`). Without one, GitHub allows
-  60 requests an hour and some release notes may be skipped, which radius will say in the brief.
-- **No progress output to parse.** With `--json`, stdout is the JSON and nothing else. Progress
-  only ever shows up for a human in a terminal.
-- **Second runs are cheap.** Everything downloaded is cached, so the "adapt, run again" loop costs
-  about as long as reading your files. `--offline` makes that explicit.
-- **Stay in one folder.** Point radius at the project root, or at one package of a monorepo:
-  `npx dep-radius ./packages/api --since HEAD --json`.
+- **Give it a GitHub token.** Set `GITHUB_TOKEN`, or log in with `gh`. Without it, GitHub allows 60
+  requests an hour and some notes may be skipped. radius says so when it happens.
+- **The output is only JSON.** With `--json`, nothing else is printed to stdout.
+- **Running it again is fast.** Downloads are cached. `--offline` uses only the cache.
+- **Monorepos.** Point it at one package: `npx dep-radius ./packages/api --since HEAD --json`.
+- **The JSON won't break.** Version 1 only adds fields. It never removes or renames one.
 
-## Docs, for agents
+## Docs for agents
 
-This site is readable by agents too:
+This site can be read by agents:
 
-| URL                         | What                                                   |
-| --------------------------- | ------------------------------------------------------ |
-| `/llms.txt`                 | An index of every page                                 |
-| `/llms-full.txt`            | Every page in one Markdown file                        |
-| Any page URL + `.md`        | That page as Markdown, like `/docs/agents.md`          |
-| `Accept: text/markdown`     | Any docs URL answers in Markdown when asked to         |
+| URL                     | What                                           |
+| ----------------------- | ---------------------------------------------- |
+| `/llms.txt`             | A list of every page                           |
+| `/llms-full.txt`        | Every page in one Markdown file                |
+| Any page URL + `.md`    | That page as Markdown, like `/docs/agents.md`  |
+| `Accept: text/markdown` | Any page answers in Markdown when asked        |
