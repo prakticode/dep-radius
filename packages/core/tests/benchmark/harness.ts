@@ -3,8 +3,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 
 import { run } from "../../src/run.ts"
 import { splitEntries } from "../../src/notes/entries.ts"
-import type { NoteEntry, PackageBrief } from "../../src/model.ts"
 import { createProject, pkgJson } from "../helpers/tmp-project.ts"
+import type { NoteEntry, PackageBrief, UnplacedEntry } from "../../src/model.ts"
 import {
   type FakePackage,
   FakeRegistry,
@@ -46,7 +46,17 @@ export interface CaseResult {
   // matched entries that are not the change: what a reader skims past
   otherMatches: number
   entries: number
+  // a code hint on the change's note points at an expected line: weaker than caught, and apart from it
+  hinted: boolean
+  // notes carrying a code hint
+  hints: number
+  // hints on another note, or on the change's note without an expected line among their sites
+  falseHints: number
 }
+
+// The JavaScript of each version, for the code hints: the fake tarballs carry only what a case ships,
+// so without it the hints have no code to read. version -> path -> contents
+export type RuntimeFiles = Record<string, Record<string, string>>
 
 export const CASES_DIR = join(import.meta.dirname, "cases")
 
@@ -142,26 +152,28 @@ function dependenciesOf(caseDir: string): FakePackage[] {
 
 export async function runCase(
   c: BenchmarkCase,
-  dir = CASES_DIR
+  dir = CASES_DIR,
+  runtime?: RuntimeFiles
 ): Promise<CaseResult> {
   const caseDir = join(dir, c.id)
   const notes = notesOf(c, caseDir)
   // a case that needs the package's types ships its real declarations under package/<version>
   const typesDir = join(caseDir, "package")
   const withTypes = existsSync(typesDir)
+  // the case's own files win: its copied package.json and declarations are the ones it measures
   const tarball = (version: string) => ({
     version,
     publishedAt: "2026-01-01T00:00:00Z",
     files: withTypes
-      ? readTree(join(typesDir, version))
-      : {
+      ? { ...runtime?.[version], ...readTree(join(typesDir, version)) }
+      : (runtime?.[version] ?? {
           "package.json": JSON.stringify({
             name: c.package,
             version,
             main: "index.js",
           }),
           "index.js": "module.exports = {}",
-        },
+        }),
   })
   const registry = new FakeRegistry([
     {
@@ -216,6 +228,14 @@ function score(c: BenchmarkCase, pkg: PackageBrief): CaseResult {
       for (const s of pkg.usage.byName[h.name] ?? [])
         linked.add(`${s.file}:${s.line}`)
   const sitesFound = c.expect.filter((s) => linked.has(s)).length
+  const hinted = [
+    ...pkg.notes.unattributedBreaking,
+    ...pkg.notes.unattributedChanges,
+  ].filter((e) => e.likely)
+  const hitsExpected = (e: UnplacedEntry) =>
+    (e.likely ?? []).some((l) =>
+      l.sites.some((s) => c.expect.includes(`${s.file}:${s.line}`))
+    )
   return {
     id: c.id,
     package: c.package,
@@ -226,12 +246,22 @@ function score(c: BenchmarkCase, pkg: PackageBrief): CaseResult {
     sitesExpected: c.expect.length,
     otherMatches: pkg.notes.matched.length - changeMatches.length,
     entries: pkg.notes.total,
+    hinted: hinted.some((e) => describesChange(c, e) && hitsExpected(e)),
+    hints: hinted.length,
+    falseHints: hinted.filter((e) => !describesChange(c, e) || !hitsExpected(e))
+      .length,
   }
 }
 
 export interface Totals {
   cases: number
   caught: number
+  // cases whose change's note carries a code hint to an expected line
+  hinted: number
+  // of those, the ones not caught by name
+  newlyHinted: number
+  // notes carrying a hint: in all, false ones, and per case
+  hints: { total: number; false: number; median: number; max: number }
   recall: number
   // of all the entries a reader is shown across the cases, the share that is the change
   precision: number
@@ -243,9 +273,19 @@ export function totals(results: CaseResult[]): Totals {
   const caught = results.filter((r) => r.status === "caught").length
   const relevant = results.filter((r) => r.entryMatched).length
   const shown = results.reduce((n, r) => n + r.otherMatches, relevant)
+  const perCase = results.map((r) => r.hints).sort((a, b) => a - b)
   return {
     cases: results.length,
     caught,
+    hinted: results.filter((r) => r.hinted).length,
+    newlyHinted: results.filter((r) => r.hinted && r.status !== "caught")
+      .length,
+    hints: {
+      total: perCase.reduce((n, h) => n + h, 0),
+      false: results.reduce((n, r) => n + r.falseHints, 0),
+      median: perCase[Math.floor(perCase.length / 2)] ?? 0,
+      max: perCase.at(-1) ?? 0,
+    },
     recall: results.length ? caught / results.length : 0,
     precision: shown ? relevant / shown : 0,
     quiet: results.filter((r) => r.verdict === "quiet").length,

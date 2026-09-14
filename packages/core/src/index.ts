@@ -21,6 +21,7 @@ export {
   renderJson,
   type SiteV1,
   toJsonV1,
+  type UnplacedV1,
 } from "./render/json.ts"
 export { renderMarkdown } from "./render/markdown.ts"
 export { parseSpec, run, type Spec, toolVersion } from "./run.ts"

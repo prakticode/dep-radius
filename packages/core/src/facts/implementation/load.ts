@@ -9,6 +9,7 @@ import type { Packument, PackumentVersion } from "../../registry/packument.ts"
 import {
   IMPLEMENTATION_ALGO,
   type ImplementationDiff,
+  type ImplementationFacts,
   type ImplementationResult,
 } from "./model.ts"
 
@@ -54,14 +55,23 @@ export type DiffResult =
   | { ok: true; diff: ImplementationDiff }
   | { ok: false; reason: string; detail?: string }
 
+export type PairResult =
+  | {
+      ok: true
+      from: ImplementationFacts
+      to: ImplementationFacts
+      diff: ImplementationDiff
+    }
+  | { ok: false; reason: string; detail?: string }
+
 // Both versions read through the same build, chosen from what the registry says they publish.
-export async function getImplementationDiff(
+export async function getImplementationPair(
   ctx: Ctx,
   cfg: RegistryConfig,
   p: Packument,
   from: string,
   to: string
-): Promise<DiffResult> {
+): Promise<PairResult> {
   const a = p.versions[from]
   const b = p.versions[to]
   if (!a || !b)
@@ -73,7 +83,23 @@ export async function getImplementationDiff(
   ])
   if (!fa.ok) return fa
   if (!fb.ok) return fb
-  return { ok: true, diff: diffImplementations(fa.facts, fb.facts) }
+  return {
+    ok: true,
+    from: fa.facts,
+    to: fb.facts,
+    diff: diffImplementations(fa.facts, fb.facts),
+  }
+}
+
+export async function getImplementationDiff(
+  ctx: Ctx,
+  cfg: RegistryConfig,
+  p: Packument,
+  from: string,
+  to: string
+): Promise<DiffResult> {
+  const pair = await getImplementationPair(ctx, cfg, p, from, to)
+  return pair.ok ? { ok: true, diff: pair.diff } : pair
 }
 
 function manifestOf(pv: PackumentVersion): Record<string, unknown> {

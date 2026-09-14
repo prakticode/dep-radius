@@ -329,6 +329,21 @@ export interface NoteMatch {
   direct: boolean
 }
 
+// A note radius cannot tie to the code by name, whose code names meet the package's code that
+// changed under an export the project uses: `setItem`, called inside `persist`, which the project
+// calls. A hint, weaker than a name match: it never changes a verdict.
+export interface LikelyReach {
+  // the export the project uses whose code changed
+  export: CanonPath
+  // the note's names found in that changed code: a changed function, or what one calls
+  via: string[]
+  sites: Site[]
+}
+
+export interface UnplacedEntry extends NoteEntry {
+  likely?: LikelyReach[]
+}
+
 export type NotesCoverage =
   "complete" | "partial" | "none-published" | "unavailable" | "disabled"
 
@@ -401,9 +416,9 @@ export interface PackageBrief {
     perVersion: VersionNotes[]
     total: number
     matched: NoteMatch[]
-    unattributedBreaking: NoteEntry[]
+    unattributedBreaking: UnplacedEntry[]
     // changes no name ties to the code: they keep an update from being quiet
-    unattributedChanges: NoteEntry[]
+    unattributedChanges: UnplacedEntry[]
   }
   usage: {
     files: number

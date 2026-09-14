@@ -13,6 +13,7 @@ import { buildInventory } from "./inventory/installed.ts"
 import { selectCandidate } from "./registry/candidates.ts"
 import { listProjectFiles } from "./inventory/manifests.ts"
 import { planSince, readBaseTree } from "./inventory/since.ts"
+import { implementationHints } from "./facts/implementation/hints.ts"
 import { isAgeExcluded, loadRegistryConfig } from "./registry/npmrc.ts"
 import { analyzeSurface, type SurfaceOutcome } from "./surface/analyze.ts"
 import {
@@ -203,6 +204,23 @@ export async function run(
           }
         )
       : undefined
+    // what the notes radius cannot tie by name may still reach, through the package's own code
+    const unplaced = match
+      ? [...match.unattributedBreaking, ...match.unattributedChanges]
+      : []
+    const hints =
+      unplaced.length > 0
+        ? await implementationHints(
+            ctx,
+            cfg,
+            pack.packument,
+            candidate,
+            usage,
+            unplaced
+          )
+        : undefined
+    if (hints && hints.status !== "computed")
+      ctx.log.debug(`${dep.name}: no code hints, ${hints.detail}`)
     const merged =
       usage && surfaceBlind
         ? { ...usage, blindSpots: [...usage.blindSpots, ...surfaceBlind] }
@@ -217,6 +235,7 @@ export async function run(
         match,
         notesDisabled: !opts.notes,
         optionSites,
+        ...(hints?.status === "computed" ? { hints: hints.hints } : {}),
       })
     )
   }

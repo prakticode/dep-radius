@@ -1,8 +1,9 @@
-import type { Brief, PackageBrief } from "../model.ts"
+import type { Brief, PackageBrief, UnplacedEntry } from "../model.ts"
 import {
   ago,
   coverageLabel,
   groupBriefs,
+  likelyLabel,
   oneNetOnly,
   opaqueLabel,
   orderFindings,
@@ -91,10 +92,12 @@ function section(p: PackageBrief, now: number): string[] {
       lines.push(
         `- ${f.entry.version}: ${f.entry.title} _(breaking, names no API)_`
       )
+      lines.push(...likelyLine(f.entry))
     } else if (++unplaced <= UNPLACED_CAP) {
       lines.push(
         `- ${f.entry.version}: ${f.entry.title} _(a change radius cannot tie to your code)_`
       )
+      lines.push(...likelyLine(f.entry))
     }
   }
   if (unplaced > UNPLACED_CAP)
@@ -108,6 +111,11 @@ function section(p: PackageBrief, now: number): string[] {
 
 // changes nothing ties to the code: a release has many, a comment shows the first few
 const UNPLACED_CAP = 5
+
+function likelyLine(e: UnplacedEntry): string[] {
+  const label = likelyLabel(e, (n) => `\`${n}\``)
+  return label ? [`  - _${label}_`] : []
+}
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)

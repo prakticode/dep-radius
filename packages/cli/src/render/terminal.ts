@@ -6,6 +6,7 @@ import {
   coverageLabel,
   type Finding,
   groupBriefs,
+  likelyLabel,
   oneNetOnly,
   opaqueLabel,
   orderFindings,
@@ -195,12 +196,16 @@ function packageBlock(
       lines.push(
         `  ${c("cyan", f.entry.version)}  ${f.entry.title}  ${c("dim", "breaking, names no API")}`
       )
+      const likely = likelyLabel(f.entry)
+      if (likely) lines.push(c("dim", `    ${likely}`))
     } else {
       if (++unplaced > unplacedCap) continue
       if (previous === "type") lines.push("")
       lines.push(
         `  ${c("cyan", f.entry.version)}  ${f.entry.title}  ${c("dim", "cannot tie to your code")}`
       )
+      const likely = likelyLabel(f.entry)
+      if (likely) lines.push(c("dim", `    ${likely}`))
     }
     previous = f.kind
   }

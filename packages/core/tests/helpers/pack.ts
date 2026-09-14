@@ -10,9 +10,15 @@ export function packTarball(
   for (const [path, content] of Object.entries(files)) {
     const data = Buffer.from(content, "utf8")
     const header = Buffer.alloc(512)
-    const name = `${root}/${path}`
-    if (name.length > 100) throw new Error(`fixture path too long: ${name}`)
+    const full = `${root}/${path}`
+    // ustar keeps a long path's directories in the 155-byte prefix field
+    const cut = full.length > 100 ? full.indexOf("/", full.length - 101) : -1
+    const name = cut >= 0 ? full.slice(cut + 1) : full
+    const prefix = cut >= 0 ? full.slice(0, cut) : ""
+    if (name.length > 100 || prefix.length > 155)
+      throw new Error(`fixture path too long: ${full}`)
     header.write(name, 0, "utf8")
+    if (prefix) header.write(prefix, 345, "utf8")
     header.write("0000644\0", 100)
     header.write("0000000\0", 108)
     header.write("0000000\0", 116)
