@@ -171,11 +171,35 @@ export function build(
     !!(t.flags & ts.TypeFlags.TypeParameter) &&
     (t as ts.TypeParameter & { isThisType?: boolean }).isThisType === true
 
-  // The names an options object may carry: the properties the package declares on an object
-  // parameter, union members included (`{ hsts } | { strictTransportSecurity }`). A class, or a type
-  // made mostly of methods, is a value handed over rather than options, and says nothing here.
+  // The names an options object may carry: the properties the package declares on it, union members
+  // included (`{ hsts } | { strictTransportSecurity }`), and intersections of objects read whole
+  // (`type Options = CurrentOptions & DeprecatedOptions`). A class, or a type made mostly of methods,
+  // is a value handed over rather than options, and says nothing here.
+  const optionProps = (t: ts.Type): ts.Symbol[] => {
+    const out: ts.Symbol[] = []
+    for (const part of t.isUnion() ? t.types : [t]) {
+      // an intersection with a part still waiting on a type argument is a shape computed from
+      // the caller's data (`JSONSchemaType<T>`), not a fixed set of options
+      const whole =
+        part.flags & ts.TypeFlags.Object ||
+        (part.isIntersection() &&
+          part.types.every((m) => m.flags & ts.TypeFlags.Object))
+      if (!whole) continue
+      if (part.getCallSignatures().length > 0) continue
+      if ((part.getSymbol()?.flags ?? 0) & ts.SymbolFlags.Class) continue
+      const props = checker.getPropertiesOfType(part).filter(inPackage)
+      const methods = props.filter(
+        (prop) => checker.getTypeOfSymbol(prop).getCallSignatures().length > 0
+      )
+      if (methods.length * 2 > props.length) continue
+      out.push(...props)
+    }
+    return out
+  }
+  // Construct signatures count the same as call signatures: `new Parser({ strict })` takes options.
   const optionsOf = (sigs: readonly ts.Signature[]): string[] | undefined => {
     const names = new Set<string>()
+    const nested = new Set<string>()
     for (const sig of sigs)
       for (const param of sig.getParameters()) {
         const decl = param.valueDeclaration
@@ -188,20 +212,22 @@ export function build(
         } catch {
           continue
         }
-        for (const part of t.isUnion() ? t.types : [t]) {
-          if (!(part.flags & ts.TypeFlags.Object)) continue
-          if (part.getCallSignatures().length > 0) continue
-          if ((part.getSymbol()?.flags ?? 0) & ts.SymbolFlags.Class) continue
-          const props = checker.getPropertiesOfType(part).filter(inPackage)
-          const methods = props.filter(
-            (prop) =>
-              checker.getTypeOfSymbol(prop).getCallSignatures().length > 0
-          )
-          if (methods.length * 2 > props.length) continue
-          for (const prop of props) names.add(prop.getName())
+        for (const prop of optionProps(t)) {
+          names.add(prop.getName())
+          // one level down, `numberParseOptions: { eNotation?: boolean }`: a note names the leaf
+          let inner: ts.Type
+          try {
+            inner = checker.getNonNullableType(checker.getTypeOfSymbol(prop))
+          } catch {
+            continue
+          }
+          for (const sub of optionProps(inner)) nested.add(sub.getName())
         }
       }
     if (names.size === 0 || names.size > OPTIONS_CAP) return undefined
+    // the nested names only while they fit: past the cap they would cost the options themselves
+    if (names.size + nested.size <= OPTIONS_CAP)
+      for (const name of nested) names.add(name)
     return [...names].sort()
   }
 
@@ -216,7 +242,8 @@ export function build(
       const rs = typeSymbolOf(checker.getReturnTypeOfSignature(first))
       if (rs) pendingReturns.push({ path, field: "returns", target: rs })
     }
-    const options = optionsOf(sigs)
+    // a value that is also a constructor, `export = Parser` or `const Client: ClientConstructor`
+    const options = optionsOf([...sigs, ...t.getConstructSignatures()])
     if (options) record.options = options
     return sigs.map((s) => signatureText(checker, s)).sort()
   }
@@ -261,10 +288,11 @@ export function build(
       }
       if (!emit(record)) continue
       const sigs = ptype.getCallSignatures()
+      // `static Parser: typeof Parser` on a namespace-like object is constructed, and takes options
+      const options = optionsOf([...sigs, ...ptype.getConstructSignatures()])
+      if (options) record.options = options
       if (sigs.length > 0) {
         record.sig = sigs.map((s) => signatureText(checker, s)).sort()
-        const options = optionsOf(sigs)
-        if (options) record.options = options
         const r = checker.getReturnTypeOfSignature(sigs[0]!)
         const rs = isThisType(r) ? undefined : typeSymbolOf(r)
         if (rs) pendingReturns.push({ path, field: "returns", target: rs })
@@ -364,10 +392,11 @@ export function build(
     try {
       if (f & ts.SymbolFlags.Class) {
         const staticType = checker.getTypeOfSymbol(sym)
-        record.sig = staticType
-          .getConstructSignatures()
-          .map((s) => signatureText(checker, s))
-          .sort()
+        const construct = staticType.getConstructSignatures()
+        record.sig = construct.map((s) => signatureText(checker, s)).sort()
+        // inherited constructors included: `class Ajv extends AjvCore` takes AjvCore's options
+        const options = optionsOf(construct)
+        if (options) record.options = options
         record.instanceOf = path
         walkMembers(
           path,

@@ -345,6 +345,89 @@ describe("options", () => {
     )
     expect(s.symbols["p:use"]?.options).toBeUndefined()
   })
+
+  it("records the options of a constructor, inherited or behind `export =`", () => {
+    const s = surface(
+      [
+        "export declare class XMLParser { constructor(options?: Partial<{ ignoreAttributes: boolean; trimValues: boolean }>); parse(xml: string): unknown }",
+        "interface CurrentOptions { strict?: boolean; allErrors?: boolean }",
+        "interface DeprecatedOptions { jsPropertySyntax?: boolean }",
+        "declare class Core { constructor(opts?: CurrentOptions & DeprecatedOptions) }",
+        "export default class Validator extends Core { compile(schema: object): unknown }",
+      ].join("\n")
+    )
+    expect(s.symbols["p:XMLParser"]?.options).toEqual([
+      "ignoreAttributes",
+      "trimValues",
+    ])
+    expect(s.symbols["p:default"]?.options).toEqual([
+      "allErrors",
+      "jsPropertySyntax",
+      "strict",
+    ])
+    const cjs = surface(
+      "declare class Pool { constructor(config?: { ssl?: boolean; max?: number }) }\nexport = Pool"
+    )
+    expect(cjs.symbols["p:"]?.options).toEqual(["max", "ssl"])
+  })
+
+  it("records the options of an options object one level down", () => {
+    const s = surface(
+      [
+        "type NumberOptions = { hex: boolean; eNotation?: boolean }",
+        "type Deep = { level?: { tooDeep?: boolean } }",
+        "export declare function parse(xml: string, options?: { numberParseOptions?: NumberOptions; deep?: Deep; tags?: string[] }): unknown",
+      ].join("\n")
+    )
+    expect(s.symbols["p:parse"]?.options).toEqual([
+      "deep",
+      "eNotation",
+      "hex",
+      "level",
+      "numberParseOptions",
+      "tags",
+    ])
+  })
+
+  it("reads no options from an intersection computed from a type argument", () => {
+    const s = surface(
+      [
+        "type Shape<T> = T extends string ? { minLength?: number } : { minimum?: number }",
+        "export declare function compile<T>(schema: Shape<T> & { $id?: string }): void",
+      ].join("\n")
+    )
+    expect(s.symbols["p:compile"]?.options).toBeUndefined()
+  })
+
+  it("resolves `new X()` on an import to the class, then to its instance members", () => {
+    const s = surface(
+      "export declare class XMLParser { constructor(options?: { trimValues?: boolean }); parse(xml: string): unknown }\nexport default XMLParser"
+    )
+    const site = { file: "a.ts", line: 1, col: 1, typeOnly: false, text: "" }
+    const base = {
+      installedId: "p",
+      pkg: "p",
+      specifier: "p",
+      entry: ".",
+      site,
+    }
+    const named = resolveRef(s, {
+      ...base,
+      binding: { kind: "named", imported: "XMLParser" },
+      chain: [{ name: "parse", call: true }],
+      callSelf: true,
+    })
+    // the class walks first as `default`, so its members live under that name
+    expect(named.paths).toEqual(["p:XMLParser", "p:default", "p:default#parse"])
+    const dflt = resolveRef(s, {
+      ...base,
+      binding: { kind: "default" },
+      chain: [],
+      callSelf: true,
+    })
+    expect(dflt.paths).toEqual(["p:default"])
+    expect(s.symbols["p:default"]?.options).toEqual(["trimValues"])
+  })
 })
 
 describe("readTarball", () => {

@@ -14,5 +14,5 @@
     "src/feeds/catalog.js:3",
     "src/feeds/catalog.js:6"
   ],
-  "status": "missed"
+  "status": "caught"
 }
