@@ -1,5 +1,15 @@
 # dep-radius
 
+## 0.4.1
+
+### Patch Changes
+
+- 6023f51: The package descriptions, keywords and READMEs now describe radius as it is used: it
+  tells an AI agent which changes in a dependency upgrade affect the code, with the files and lines
+  to check.
+- Updated dependencies [6023f51]
+  - @dep-radius/core@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
