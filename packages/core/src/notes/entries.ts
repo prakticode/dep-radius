@@ -1,11 +1,12 @@
 import { sha1 } from "../infra/hash.ts"
 import type { NoteEntry, RegionKind } from "../model.ts"
 
-// A heading says a whole section breaks; a title has to lead with it. "non-breaking" and a bullet that
-// merely mentions breaking somewhere in its prose are not markers.
+// A heading says a whole section breaks; a title has to lead with it, emphasised or not ("*Breaking*:",
+// "__Breaking:__"). "non-breaking" and a bullet that merely mentions breaking somewhere in its prose
+// are not markers.
 const BREAKING_HEADING = /(?<!non[- ])breaking|⚠️|:warning:|major changes/i
 const BREAKING_TITLE =
-  /^\s*(\*\*|\[|\()?\s*(⚠️|:warning:|breaking|💥|:boom:)|BREAKING CHANGE/i
+  /^\s*(\*{1,2}|_{1,2}|\[|\()?\s*(⚠️|:warning:|breaking|💥|:boom:)|BREAKING CHANGE/i
 const NOISE =
   /^(ci|chore|test|tests|docs|doc|build|style|refactor|perf\(bench\)|release|revert)(\([^)]*\))?!?:|^(deps?|dependencies)(\([^)]*\))?:|^bump\s+\S+\s+from\s|^merge (pull request|branch)|^update dependency\b|^v?\d+\.\d+\.\d+$/i
 

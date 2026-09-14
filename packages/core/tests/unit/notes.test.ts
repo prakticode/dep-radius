@@ -79,6 +79,14 @@ describe("splitEntries", () => {
     )
     expect(e.map((x) => x.breakingMarker)).toEqual([false, true, true])
   })
+
+  it("marks a title that leads with breaking in any emphasis", () => {
+    const e = splitEntries(
+      "13.0.0",
+      "### Changed\n\n- *Breaking*: excess command-arguments cause an error by default\n- _Breaking_: throw on unsupported option flags\n- __Breaking:__ drop Node 18\n- *Improved* help output\n"
+    )
+    expect(e.map((x) => x.breakingMarker)).toEqual([true, true, true, false])
+  })
 })
 
 describe("matchNotes", () => {
