@@ -1,5 +1,37 @@
 # @dep-radius/core
 
+## 0.4.2
+
+### Patch Changes
+
+- 009304a: A release note about an option now also lands on the classes you construct with it:
+  `new Ajv({ strict })` or `new XMLParser({ ... })` accept the options their constructor declares,
+  inherited constructors and `export =` classes included, the same way `config({ quiet })` already
+  did for functions. Options types written as an intersection (`CurrentOptions & DeprecatedOptions`)
+  are read too. A method called on the constructed object (`new Parser().parse()`) is now found in
+  the types as well.
+
+  Options one level down count too: a note about `eNotation` lands on `new XMLParser({ ... })`,
+  whose options take `numberParseOptions: { eNotation }`.
+
+- e7a2617: radius now reads the types a package takes from its own dependencies. `useQuery` in
+  `@tanstack/react-query` accepts options declared in `@tanstack/query-core`: those options were
+  invisible, so a release note about one could not reach your `useQuery` calls. When it reads a
+  package version's types, radius also loads the declarations of the dependencies and peer
+  dependencies they import, one level down, at the version the package's range picks, from the same
+  registry and cache. A few packages and a few megabytes at most; dependencies without types are
+  skipped. Offline, what is cached is used, and a type surface missing a dependency that could not
+  be fetched is not kept, so the next run completes it.
+- cba6aa8: The list of release notes radius cannot tie to your code is shorter and cleaner. A
+  release's opening sentence ("Zod 4.5 is now available."), pointers to a migration guide, work on
+  the project itself (tests, CI, linting, spelling, readme, dev dependencies, thanks), and changes
+  to TypeScript typings only are no longer listed. A labelled list like "breaking:" or
+  "**resolve**:" is split into its items, so each change is judged on its own and a breaking label
+  still marks its items.
+
+  A breaking section that only mentions a few APIs in its text now stays a break that could apply to
+  anyone, instead of being read as someone else's.
+
 ## 0.4.1
 
 ### Patch Changes
