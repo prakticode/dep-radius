@@ -4,24 +4,31 @@ import { existsSync, readFileSync } from "node:fs"
 import ts from "typescript"
 
 export const PKG_ROOT = "/pkg"
+// above /pkg, so the package's own imports find them the way Node would
+export const DEPS_ROOT = "/node_modules"
 
 const libDir = dirname(ts.getDefaultLibFilePath({}))
 const libSources = new Map<string, ts.SourceFile>()
 
-// A compiler host that sees the tarball's declarations under /pkg and the TypeScript lib files the
-// tool itself bundles, nothing else: the user's node_modules can never change a surface.
-export function createVfsHost(files: Map<string, Buffer>): ts.CompilerHost {
+// A compiler host that sees the tarball's declarations under /pkg, the declarations of the
+// dependencies it imports under /node_modules, and the TypeScript lib files the tool itself bundles,
+// nothing else: the user's node_modules can never change a surface.
+export function createVfsHost(
+  files: Map<string, Buffer>,
+  dependencies: ReadonlyMap<string, Map<string, Buffer>> = new Map()
+): ts.CompilerHost {
   const texts = new Map<string, string>()
-  const dirs = new Set<string>([PKG_ROOT])
-  for (const [rel, buf] of files) {
-    const abs = `${PKG_ROOT}/${rel}`
-    texts.set(abs, buf.toString("utf8"))
-    let d = dirname(abs)
-    while (d.startsWith(PKG_ROOT) && !dirs.has(d)) {
-      dirs.add(d)
-      d = dirname(d)
+  const dirs = new Set<string>(["/"])
+  const mount = (root: string, tree: Map<string, Buffer>) => {
+    for (const [rel, buf] of tree) {
+      const abs = `${root}/${rel}`
+      texts.set(abs, buf.toString("utf8"))
+      for (let d = dirname(abs); !dirs.has(d); d = dirname(d)) dirs.add(d)
     }
   }
+  mount(PKG_ROOT, files)
+  dirs.add(PKG_ROOT)
+  for (const [name, tree] of dependencies) mount(`${DEPS_ROOT}/${name}`, tree)
   const isLib = (f: string) => f.startsWith(libDir)
   return {
     getSourceFile(fileName, languageVersion) {

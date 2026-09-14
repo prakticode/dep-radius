@@ -20,6 +20,7 @@ cases/<package>-<change>/
   notes/        the release notes, copied verbatim, one file per version
   project/      a small project using the package the way real code does
   package/      optional: the package.json and declaration files of both versions, copied verbatim
+  dependencies/ optional: the same for the packages whose types the package imports
 ```
 
 | Field        | What                                                                               |
@@ -37,6 +38,13 @@ Each case runs the full pipeline against the fake registry, with the notes serve
 releases. The type surface is off, unless the case ships the package's real declarations under
 `package/<version>/`: a note about an option lands on the calls whose types accept it, so those
 cases need the types of both versions.
+
+A package's declarations can use types from its own dependencies: `useQuery` in
+`@tanstack/react-query` takes options declared in `@tanstack/query-core`. radius loads the types of
+the dependencies the declarations import, at the version the package's range picks. A case that
+needs them ships each version under `dependencies/<name>@<version>/`, a scope as its own folder
+(`dependencies/@tanstack/query-core@5.100.14/`), served by the same fake registry. Without it, the
+dependency is not found and its types stay unresolved, as they were before.
 
 ## The numbers
 
@@ -56,7 +64,9 @@ cases need the types of both versions.
 2. Copy the notes exactly as published into `notes/<version>.md`: the release body, or the version's
    section of the changelog without its heading. Never rewrite them.
 3. When the change is about an option, copy `package.json` and every `.d.ts` file of both versions
-   from their npm tarballs into `package/<version>/`.
+   from their npm tarballs into `package/<version>/`. When the option is declared in a dependency's
+   types, copy that dependency the same way into `dependencies/<name>@<version>/`, for each version
+   the two ranges pick. Never edit the copies.
 4. Write the smallest project that uses the package the way real code does, without adding names
    just so the note matches.
 5. Write `expect` from what the change breaks, before running radius. Only lines that use the
