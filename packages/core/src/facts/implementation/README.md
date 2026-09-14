@@ -2,7 +2,8 @@
 
 For each export of a package version: which of the package's own functions it can run, and a
 fingerprint of each one's code. Two versions compared give the exports whose code changed inside,
-and the functions that changed. Not used by any verdict yet: this folder is a measured spike.
+and the functions that changed. Never used by a verdict: it only adds hints to notes radius cannot
+tie to the code by name (`hints.ts`, see [Hints](#hints)).
 
 ## Why
 
@@ -129,3 +130,23 @@ Wire it in as a ranking and linking hint, never as a verdict, and only where it 
    silent.
 5. Before trusting it more, measure it on upgrades where the project did not need a change: this
    benchmark has only real changes, so it measures misses, not false alarms.
+
+## Hints
+
+Points 1 to 3 are wired in (`hints.ts`, called by `run.ts` after the notes are matched):
+
+- Only for a package the project uses by name, when a note in `unattributedBreaking` or
+  `unattributedChanges` has a code name (`notes/code-names.ts`: code spans, code-shaped words, a
+  commit scope). Not for a major (or a 0.x minor): it rewrites shared code and the gate below would
+  turn it off after paying for both parses. Both versions come from the cached tarballs; a failure
+  or a capped build means no hint, never an error.
+- Off when more than `HINT_CHANGED_SHARE` (25%) of the exports changed, over the whole package or
+  over the entry points the project imports, whichever is larger.
+- The near rule, from the exports the project uses (`used.ts`). A note linked to more than 3 exports
+  gets no hint.
+- The note stays where it is, with `likely: [{ export, via, sites }]` added. Verdicts never read it.
+
+On the benchmark with `--runtime` (51 cases): 3 cases hinted, none of them caught by name (`qs`,
+`rxjs`, `zustand`), 5 hints, 2 on other notes. At 35% it hints 4 cases with 5 false hints, at 50% 4
+with 7. The spike script now reads code names with `notes/code-names.ts`, so its counts can differ
+by one or two from the table above.

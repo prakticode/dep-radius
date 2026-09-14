@@ -8,6 +8,7 @@ export {
   groupBriefs,
   type Groups,
   isUnseenOnly,
+  likelyLabel,
   oneNetOnly,
   opaqueLabel,
   orderFindings,

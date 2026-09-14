@@ -4,8 +4,9 @@ Real release notes that changed behaviour, and the lines of a project they land 
 thing: does radius tie a documented behaviour change to the code it affects?
 
 ```sh
-pnpm benchmark          # the table and the totals
-pnpm benchmark --json   # the same, for a script
+pnpm benchmark            # the table and the totals
+pnpm benchmark --json     # the same, for a script
+pnpm benchmark --runtime  # with each version's JavaScript from npm, for the code hints
 ```
 
 The cases also run with the tests (`benchmark.test.ts`). Each one records whether radius catches it
@@ -56,6 +57,14 @@ dependency is not found and its types stay unresolved, as they were before.
 - **verdict**: the upgrade's verdict in that case.
 - **sites**: expected sites linked, out of those listed.
 - **other notes**: matched notes that are not the change, out of every entry read.
+- **hinted**: the change's note is one radius cannot tie by name, and its code hint (`likely`)
+  points at an expected line. Counted apart from caught: a hint never changes a status or a verdict.
+- **hints**: notes carrying a code hint; **false** ones are on another note, or point at no expected
+  line.
+
+The fake tarballs hold only what a case ships, so the code hints have no JavaScript to read and
+nothing is hinted by default. `--runtime` downloads both versions from the npm registry, through the
+normal cache, and serves their JavaScript next to the case's own files. The tests never do.
 
 ## Adding a case
 

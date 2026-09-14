@@ -83,6 +83,14 @@ Each entry of `touched`:
 | `breakingWithoutApi`  | Breaking entries that name no API, so they could apply to anyone              |
 | `changesWithoutApi`   | Other changes radius can't tie to your code: they name no API, or name one it can't place without types |
 
+Each entry of `breakingWithoutApi` and `changesWithoutApi` has `version`, `title` and `refs`. It can also have `likely`: a hint, never part of the verdict. The note names code inside the package (`setItem`) that changed under an export you use (`persist`), so it probably reaches your code there. Each item has:
+
+| Field    | What                                                                  |
+| -------- | --------------------------------------------------------------------- |
+| `export` | The export you use whose code changed, like `schemakit:parse`          |
+| `via`    | The note's names found in that changed code                           |
+| `sites`  | Where your code uses the export                                       |
+
 ### `usage`
 
 | Field          | What                                                                     |

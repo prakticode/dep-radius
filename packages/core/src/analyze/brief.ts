@@ -7,9 +7,12 @@ import type { CollectedNotes } from "../notes/collect.ts"
 import type {
   Candidate,
   InstalledDep,
+  LikelyReach,
+  NoteEntry,
   PackageBrief,
   PackageUsage,
   Site,
+  UnplacedEntry,
 } from "../model.ts"
 
 export interface BriefParts {
@@ -22,6 +25,18 @@ export interface BriefParts {
   notesDisabled: boolean
   // the calls that accept each option name, for the notes that name an option
   optionSites?: Record<string, Site[]>
+  // entry id -> the used exports whose changed code the note names: shown, never judged
+  hints?: Map<string, LikelyReach[]>
+}
+
+function withHints(
+  entries: NoteEntry[],
+  hints: Map<string, LikelyReach[]> | undefined
+): UnplacedEntry[] {
+  return entries.map((e) => {
+    const likely = hints?.get(e.id)
+    return likely ? { ...e, likely } : e
+  })
 }
 
 export function buildPackageBrief(parts: BriefParts): PackageBrief {
@@ -40,8 +55,14 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
         perVersion: parts.notes?.perVersion ?? [],
         total: parts.match?.total ?? 0,
         matched: parts.match?.matched ?? [],
-        unattributedBreaking: parts.match?.unattributedBreaking ?? [],
-        unattributedChanges: parts.match?.unattributedChanges ?? [],
+        unattributedBreaking: withHints(
+          parts.match?.unattributedBreaking ?? [],
+          parts.hints
+        ),
+        unattributedChanges: withHints(
+          parts.match?.unattributedChanges ?? [],
+          parts.hints
+        ),
       }
   const from = semver.parse(candidate.from)
   const to = semver.parse(candidate.to)

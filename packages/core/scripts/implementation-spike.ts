@@ -23,6 +23,7 @@ import semver from "semver"
 import { createCtx } from "../src/context.ts"
 import type { Options } from "../src/options.ts"
 import { scanUsage } from "../src/usage/scan.ts"
+import { codeNames } from "../src/notes/code-names.ts"
 import { splitEntries } from "../src/notes/entries.ts"
 import { defaultCacheDir } from "../src/infra/cache.ts"
 import { getPackument } from "../src/registry/packument.ts"
@@ -31,7 +32,6 @@ import { loadRegistryConfig } from "../src/registry/npmrc.ts"
 import { buildInventory } from "../src/inventory/installed.ts"
 import { listProjectFiles } from "../src/inventory/manifests.ts"
 import type { CanonPath, NoteEntry, RawRef } from "../src/model.ts"
-import { effectiveChain, entryPrefix } from "../src/symbol-path.ts"
 import { createProject, pkgJson } from "../tests/helpers/tmp-project.ts"
 import {
   type BenchmarkCase,
@@ -49,6 +49,7 @@ import {
   type ImplementationFacts,
   reach,
   shortName,
+  usedExports,
 } from "../src/facts/implementation/index.ts"
 
 const { values } = parseArgs({
@@ -96,72 +97,6 @@ const ctx = createCtx({
   color: false,
 } satisfies Options)
 const cfg = loadRegistryConfig(process.cwd(), process.env)
-
-// Words that read as code: `inCode`, camelCase, snake_case, a scope such as `**throttle:**` or
-// `fix(storage):`. Plain English words are left out, since a package often has a unit named `state`.
-function codeNames(e: NoteEntry): string[] {
-  const out = new Set<string>()
-  for (const r of e.regions)
-    if (r.kind === "inline-code" || r.kind === "code-block")
-      for (const m of r.text.matchAll(/[A-Za-z_$][\w$]*/g)) out.add(m[0])
-  for (const t of [e.title, ...e.regions.map((r) => r.text)]) {
-    for (const m of t.matchAll(/[A-Za-z_$][\w$]*/g))
-      if (/[a-z][A-Z]|[_$]|\d/.test(m[0]) || /^[A-Z][a-z]+[A-Z]/.test(m[0]))
-        out.add(m[0])
-    for (const m of t.matchAll(/\*\*([\w$]+):\*\*|\w+\(([\w$-]+)\)!?:/g))
-      out.add((m[1] ?? m[2])!)
-  }
-  return [...out].filter((w) => w.length >= 3).sort()
-}
-
-// The exports a usage reference reaches, spelled as the facts spell them.
-function usedPaths(
-  pkg: string,
-  refs: RawRef[],
-  facts: ImplementationFacts
-): CanonPath[] {
-  const out = new Set<CanonPath>()
-  for (const r of refs) {
-    const ref =
-      r.binding.kind === "derived" && r.origin
-        ? {
-            ...r,
-            binding: r.origin.binding,
-            entry: r.origin.entry,
-            chain: [...r.origin.chain, ...r.chain],
-            callSelf: r.origin.callSelf,
-          }
-        : r
-    if (ref.binding.kind === "derived") continue
-    const prefix = entryPrefix(pkg, ref.entry)
-    const { segs, startsCalled } = effectiveChain(ref)
-    const candidates: string[] = []
-    const [a, b] = segs
-    if (a && !startsCalled) {
-      candidates.push(`${prefix}:${a.name}`)
-      if (b)
-        candidates.push(
-          `${prefix}:${a.name}#${b.name}`,
-          `${prefix}:${a.name}.${b.name}`
-        )
-    }
-    if (a && startsCalled) candidates.push(`${prefix}:#${a.name}`)
-    // ESM `export default lib` with `lib.get()`
-    if (a && ref.binding.kind === "default")
-      candidates.push(
-        `${prefix}:default.${a.name}`,
-        `${prefix}:default#${a.name}`
-      )
-    const found = candidates.filter((c) => facts.exports[c])
-    // the module itself, when the reference names nothing more precise
-    if (found.length === 0)
-      found.push(
-        ...[`${prefix}:`, `${prefix}:default`].filter((c) => facts.exports[c])
-      )
-    for (const c of found) out.add(c)
-  }
-  return [...out].sort()
-}
 
 async function versionsOf(c: BenchmarkCase) {
   const pack = await getPackument(ctx, cfg, c.package)
@@ -247,7 +182,9 @@ async function measure(c: BenchmarkCase): Promise<Row> {
       changed: diff.changed.length,
     })
 
-    const used = usedPaths(c.package, await usageOf(c), a.facts)
+    const used = [
+      ...usedExports(c.package, await usageOf(c), a.facts).keys(),
+    ].sort()
     const changedBy = new Map(diff.changed.map((ch) => [ch.path, ch.units]))
     const usedChanged = used.filter((p) => changedBy.has(p))
     const changedUnits = [

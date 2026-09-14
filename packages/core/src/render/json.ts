@@ -1,9 +1,9 @@
 import type {
   Brief,
   Counted,
-  NoteEntry,
   PackageBrief,
   Site,
+  UnplacedEntry,
   VerdictReason,
 } from "../model.ts"
 
@@ -18,6 +18,15 @@ export interface SiteV1 {
   typeOnly: boolean
   code: string
   via?: string[]
+}
+
+// A note radius cannot tie to the code by name. `likely`: the exports you use whose code changed
+// inside and that the note's code names point at, with your sites. A hint, never part of the verdict.
+export interface UnplacedV1 {
+  version: string
+  title: string
+  refs: string[]
+  likely?: { export: string; via: string[]; sites: SiteV1[] }[]
 }
 
 export interface CannotSeeV1 {
@@ -68,8 +77,8 @@ export interface PackageV1 {
       refs: string[]
       names: { name: string; certainty: "exact" | "by-name"; where: string }[]
     }[]
-    breakingWithoutApi: { version: string; title: string; refs: string[] }[]
-    changesWithoutApi: { version: string; title: string; refs: string[] }[]
+    breakingWithoutApi: UnplacedV1[]
+    changesWithoutApi: UnplacedV1[]
   }
   usage: {
     files: number
@@ -242,10 +251,19 @@ function countedV1(c: Counted<string>): CannotSeeV1 {
   return { kind: c.kind, count: c.count, examples: c.examples.map(siteV1) }
 }
 
-function entryV1(e: NoteEntry): {
-  version: string
-  title: string
-  refs: string[]
-} {
-  return { version: e.version, title: e.title, refs: e.refs }
+function entryV1(e: UnplacedEntry): UnplacedV1 {
+  return {
+    version: e.version,
+    title: e.title,
+    refs: e.refs,
+    ...(e.likely
+      ? {
+          likely: e.likely.map((l) => ({
+            export: l.export,
+            via: l.via,
+            sites: l.sites.map(siteV1),
+          })),
+        }
+      : {}),
+  }
 }

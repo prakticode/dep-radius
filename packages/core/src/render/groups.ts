@@ -1,12 +1,13 @@
 import { UNSEEN_LABEL } from "../labels.ts"
+import { lastName } from "../symbol-path.ts"
 import type {
   Brief,
-  NoteEntry,
   NoteHit,
   NoteMatch,
   PackageBrief,
   Site,
   Touched,
+  UnplacedEntry,
 } from "../model.ts"
 
 // reasons that say "the tool cannot see", as opposed to "something changed that you use"
@@ -57,8 +58,31 @@ export function isUnseenOnly(p: PackageBrief): boolean {
 export type Finding =
   | { kind: "type"; touched: Touched }
   | { kind: "note"; match: NoteMatch }
-  | { kind: "breaking-no-api"; entry: NoteEntry }
-  | { kind: "change-no-api"; entry: NoteEntry }
+  | { kind: "breaking-no-api"; entry: UnplacedEntry }
+  | { kind: "change-no-api"; entry: UnplacedEntry }
+
+// a note the package's code ties to an export you use comes before the ones nothing ties, so a
+// capped list keeps it
+function hintedFirst(entries: UnplacedEntry[]): UnplacedEntry[] {
+  return [
+    ...entries.filter((e) => e.likely),
+    ...entries.filter((e) => !e.likely),
+  ]
+}
+
+// "src/store.ts:5, via setItem inside persist": where a note radius cannot tie by name probably
+// lands, through the package's own code. The first export only, and its first site.
+export function likelyLabel(
+  e: UnplacedEntry,
+  format: (name: string) => string = (name) => name
+): string | undefined {
+  const first = e.likely?.[0]
+  const site = first?.sites[0]
+  if (!first || !site) return undefined
+  const more =
+    first.sites.length > 1 ? ` (+${first.sites.length - 1} more)` : ""
+  return `probably reaches: ${site.file}:${site.line}${more}, via ${first.via.map(format).join(", ")} inside ${format(lastName(first.export) || first.export)}`
+}
 
 // What a package's reader sees, most pressing first: what breaks and is tied to their code, then
 // what is tied to it, then what may break, then what may concern them. Nothing is left out, and
@@ -77,11 +101,11 @@ export function orderFindings(p: PackageBrief): Finding[] {
   const all: Finding[] = [
     ...p.surface.touched.map((touched) => ({ kind: "type" as const, touched })),
     ...p.notes.matched.map((match) => ({ kind: "note" as const, match })),
-    ...p.notes.unattributedBreaking.map((entry) => ({
+    ...hintedFirst(p.notes.unattributedBreaking).map((entry) => ({
       kind: "breaking-no-api" as const,
       entry,
     })),
-    ...p.notes.unattributedChanges.map((entry) => ({
+    ...hintedFirst(p.notes.unattributedChanges).map((entry) => ({
       kind: "change-no-api" as const,
       entry,
     })),

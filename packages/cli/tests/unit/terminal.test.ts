@@ -205,6 +205,55 @@ describe("renderTerminal", () => {
     expect(out).toContain("src/schema.ts:4")
   })
 
+  it("shows where a note it cannot tie by name probably lands, under the note", () => {
+    const unplaced = (id: string, title: string) => ({
+      id,
+      version: "1.0.1",
+      title,
+      headingPath: [],
+      regions: [],
+      breakingMarker: false,
+      noise: false,
+      kind: "change" as const,
+      refs: [],
+    })
+    const review = pkg({
+      pkg: "acme-store",
+      verdict: "review",
+      notes: {
+        coverage: "complete",
+        perVersion: [],
+        total: 2,
+        matched: [],
+        unattributedBreaking: [],
+        unattributedChanges: [
+          unplaced("a", "Faster startup"),
+          {
+            ...unplaced("b", "fix(storage): avoid calling setItem"),
+            likely: [
+              {
+                export: "acme-store/middleware:persist",
+                via: ["setItem"],
+                sites: [site("src/store.ts", 5), site("src/other.ts", 2)],
+              },
+            ],
+          },
+        ],
+      },
+    })
+    const out = renderTerminal(
+      { ...brief, packages: [review] },
+      { color: false, verbose: false, now: NOW }
+    )
+    const lines = out.split("\n")
+    const note = lines.findIndex((l) => l.includes("avoid calling setItem"))
+    expect(lines[note + 1]).toBe(
+      "    probably reaches: src/store.ts:5 (+1 more), via setItem inside persist"
+    )
+    // a hinted note comes before the ones nothing ties to the code
+    expect(note).toBeLessThan(lines.findIndex((l) => l.includes("Faster")))
+  })
+
   it("ends with the limits and a one-line summary", () => {
     expect(text).toContain("Transitive dependencies are out of scope.")
     expect(text.trimEnd().split("\n").at(-1)).toBe(

@@ -119,6 +119,40 @@
         "examples": { "type": "array", "items": { "$ref": "#/$defs/site" } }
       }
     },
+    "unplaced": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "title", "refs"],
+      "properties": {
+        "version": { "type": "string" },
+        "title": { "type": "string" },
+        "refs": { "type": "array", "items": { "type": "string" } },
+        "likely": {
+          "type": "array",
+          "description": "A hint, never part of the verdict: exports you use whose code changed inside, and that the note's code names point at",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["export", "via", "sites"],
+            "properties": {
+              "export": {
+                "type": "string",
+                "description": "The export, as package:name"
+              },
+              "via": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "The note's names found in that export's changed code: a changed function, or what one calls"
+              },
+              "sites": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/site" }
+              }
+            }
+          }
+        }
+      }
+    },
     "reason": {
       "type": "object",
       "additionalProperties": false,
@@ -264,29 +298,11 @@
             },
             "breakingWithoutApi": {
               "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["version", "title", "refs"],
-                "properties": {
-                  "version": { "type": "string" },
-                  "title": { "type": "string" },
-                  "refs": { "type": "array", "items": { "type": "string" } }
-                }
-              }
+              "items": { "$ref": "#/$defs/unplaced" }
             },
             "changesWithoutApi": {
               "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["version", "title", "refs"],
-                "properties": {
-                  "version": { "type": "string" },
-                  "title": { "type": "string" },
-                  "refs": { "type": "array", "items": { "type": "string" } }
-                }
-              }
+              "items": { "$ref": "#/$defs/unplaced" }
             }
           }
         },
