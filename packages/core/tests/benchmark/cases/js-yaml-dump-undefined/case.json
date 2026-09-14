@@ -1,0 +1,17 @@
+{
+  "package": "js-yaml",
+  "from": "3.14.1",
+  "to": "4.0.0",
+  "repository": "https://github.com/nodeca/js-yaml",
+  "sources": {
+    "4.0.0": "https://github.com/nodeca/js-yaml/blob/master/CHANGELOG.md#400---2021-01-03"
+  },
+  "change": [
+    "dump() now serializes undefined as null in collections"
+  ],
+  "why": "A config writer passes objects with undefined values: 4.0 drops those keys from the written file without an error.",
+  "expect": [
+    "src/config/write.js:5"
+  ],
+  "status": "caught"
+}

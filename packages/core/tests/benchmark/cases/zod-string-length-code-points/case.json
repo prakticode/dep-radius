@@ -1,0 +1,11 @@
+{
+  "package": "zod",
+  "from": "4.4.3",
+  "to": "4.5.0",
+  "repository": "https://github.com/colinhacks/zod",
+  "sources": { "4.5.0": "https://github.com/colinhacks/zod/releases/tag/v4.5.0" },
+  "change": ["String length counts code points"],
+  "why": ".min() now counts emoji as one character, so a feedback message of five to nine emoji that passed .min(10) is rejected. Types and tests stay green.",
+  "expect": ["src/feedback/schema.ts:5"],
+  "status": "caught"
+}

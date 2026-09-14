@@ -1,0 +1,11 @@
+{
+  "package": "validator",
+  "from": "13.12.0",
+  "to": "13.15.0",
+  "repository": "https://github.com/validatorjs/validator.js",
+  "sources": { "13.15.0": "https://github.com/validatorjs/validator.js/blob/master/CHANGELOG.md#13150" },
+  "change": ["isEmail reject starting with double quotes"],
+  "why": "Sign-up now refuses quoted local parts that used to be accepted, in a minor release.",
+  "expect": ["src/signup/validate.ts:4"],
+  "status": "caught"
+}

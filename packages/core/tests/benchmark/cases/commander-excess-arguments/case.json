@@ -1,0 +1,20 @@
+{
+  "package": "commander",
+  "from": "12.1.0",
+  "to": "13.0.0",
+  "repository": "https://github.com/tj/commander.js",
+  "sources": {
+    "13.0.0": "https://github.com/tj/commander.js/blob/master/CHANGELOG.md#1300-2024-12-30"
+  },
+  "change": [
+    "excess command-arguments cause an error by default",
+    "It is now an error for the user to specify more command-arguments"
+  ],
+  "why": "A deploy script reads extra arguments from program.args without declaring them; version 13 exits with too many arguments. The fix goes on the program chain (reported at its first line) and on program.args.",
+  "expect": [
+    "bin/deploy.js:4",
+    "bin/deploy.js:7",
+    "bin/deploy.js:10"
+  ],
+  "status": "caught"
+}

@@ -8,3 +8,5 @@ pnpm-lock.yaml
 .source/
 next-env.d.ts
 *.mdx
+# the benchmark copies release notes verbatim, and its fixture projects are data
+packages/core/tests/benchmark/cases/

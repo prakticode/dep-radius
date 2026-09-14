@@ -1,0 +1,201 @@
+import { join, relative } from "node:path"
+import { readdirSync, readFileSync, statSync } from "node:fs"
+
+import { run } from "../../src/run.ts"
+import { splitEntries } from "../../src/notes/entries.ts"
+import type { NoteEntry, PackageBrief } from "../../src/model.ts"
+import { createProject, pkgJson } from "../helpers/tmp-project.ts"
+import { FakeRegistry, testCtx, testOptions } from "../helpers/fake-registry.ts"
+
+// A documented behaviour change from a real release, and the lines of a project it lands on. The
+// notes are copied verbatim from the release; the project is small and uses the package the way
+// real code does. `status` records what radius does today, so a case that starts or stops being
+// caught fails the test until someone updates it on purpose.
+export interface BenchmarkCase {
+  id: string
+  package: string
+  from: string
+  to: string
+  repository: string
+  // version -> where the notes were copied from
+  sources: Record<string, string>
+  // words copied from the notes that only the entries describing the change contain; any one of
+  // those entries linked to an expected line counts
+  change: string[]
+  why: string
+  // file:line sites, relative to the project
+  expect: string[]
+  status: "caught" | "missed"
+}
+
+export interface CaseResult {
+  id: string
+  package: string
+  status: "caught" | "missed"
+  // the change's entry matched at all, even without reaching an expected line
+  entryMatched: boolean
+  sitesFound: number
+  sitesExpected: number
+  // matched entries that are not the change: what a reader skims past
+  otherMatches: number
+  entries: number
+}
+
+export const CASES_DIR = join(import.meta.dirname, "cases")
+
+export function loadCases(dir = CASES_DIR): BenchmarkCase[] {
+  return readdirSync(dir)
+    .filter((id) => statSync(join(dir, id)).isDirectory())
+    .sort()
+    .map((id) => {
+      const c = JSON.parse(
+        readFileSync(join(dir, id, "case.json"), "utf8")
+      ) as Omit<BenchmarkCase, "id">
+      return { id, ...c }
+    })
+}
+
+function readTree(root: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const abs = join(dir, name)
+      if (statSync(abs).isDirectory()) walk(abs)
+      else out[relative(root, abs)] = readFileSync(abs, "utf8")
+    }
+  }
+  walk(root)
+  return out
+}
+
+function notesOf(c: BenchmarkCase, dir: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const version of Object.keys(c.sources))
+    out[version] = readFileSync(join(dir, "notes", `${version}.md`), "utf8")
+  return out
+}
+
+// The words of an entry as a reader sees them, backticks and line breaks gone.
+function entryText(e: NoteEntry): string {
+  return [e.title, ...e.regions.map((r) => r.text)]
+    .join(" ")
+    .replace(/`/g, "")
+    .replace(/\s+/g, " ")
+}
+
+function describesChange(c: BenchmarkCase, e: NoteEntry): boolean {
+  const text = entryText(e)
+  return c.change.some((words) => text.includes(words))
+}
+
+// A case whose change is in no entry of its own notes measures nothing: fail loudly instead.
+export function assertWellFormed(c: BenchmarkCase, dir = CASES_DIR): void {
+  const entries = Object.entries(notesOf(c, join(dir, c.id))).flatMap(
+    ([version, body]) => splitEntries(version, body)
+  )
+  for (const words of c.change)
+    if (!entries.some((e) => entryText(e).includes(words)))
+      throw new Error(`${c.id}: no entry contains "${words}"`)
+}
+
+export async function runCase(
+  c: BenchmarkCase,
+  dir = CASES_DIR
+): Promise<CaseResult> {
+  const caseDir = join(dir, c.id)
+  const notes = notesOf(c, caseDir)
+  const tarball = (version: string) => ({
+    version,
+    publishedAt: "2026-01-01T00:00:00Z",
+    files: {
+      "package.json": JSON.stringify({
+        name: c.package,
+        version,
+        main: "index.js",
+      }),
+      "index.js": "module.exports = {}",
+    },
+  })
+  const registry = new FakeRegistry([
+    {
+      name: c.package,
+      repository: `git+${c.repository}.git`,
+      versions: [tarball(c.from), tarball(c.to)],
+      releases: Object.fromEntries(
+        Object.entries(notes).map(([v, body]) => [`v${v}`, body])
+      ),
+    },
+  ])
+  const project = createProject({
+    files: {
+      "package.json": pkgJson({
+        name: "benchmark-project",
+        private: true,
+        dependencies: { [c.package]: `^${c.from}` },
+      }),
+      [`node_modules/${c.package}/package.json`]: JSON.stringify({
+        name: c.package,
+        version: c.from,
+      }),
+      ...readTree(join(caseDir, "project")),
+    },
+  })
+  try {
+    // the notes net alone: types are another measurement
+    const opts = testOptions(project.root, {
+      specs: [`${c.package}@${c.to}`],
+      surface: false,
+    })
+    const brief = await run(opts, testCtx(opts, registry))
+    const pkg = brief.packages.find((p) => p.pkg === c.package)
+    if (!pkg)
+      throw new Error(
+        `${c.id}: no brief for ${c.package}: ${JSON.stringify(brief.notAnalyzed)}`
+      )
+    return score(c, pkg)
+  } finally {
+    project.cleanup()
+  }
+}
+
+function score(c: BenchmarkCase, pkg: PackageBrief): CaseResult {
+  const changeMatches = pkg.notes.matched.filter((m) =>
+    describesChange(c, m.entry)
+  )
+  const linked = new Set<string>()
+  for (const m of changeMatches)
+    for (const h of m.hits)
+      for (const s of pkg.usage.byName[h.name] ?? [])
+        linked.add(`${s.file}:${s.line}`)
+  const sitesFound = c.expect.filter((s) => linked.has(s)).length
+  return {
+    id: c.id,
+    package: c.package,
+    status: sitesFound > 0 ? "caught" : "missed",
+    entryMatched: changeMatches.length > 0,
+    sitesFound,
+    sitesExpected: c.expect.length,
+    otherMatches: pkg.notes.matched.length - changeMatches.length,
+    entries: pkg.notes.total,
+  }
+}
+
+export interface Totals {
+  cases: number
+  caught: number
+  recall: number
+  // of all the entries a reader is shown across the cases, the share that is the change
+  precision: number
+}
+
+export function totals(results: CaseResult[]): Totals {
+  const caught = results.filter((r) => r.status === "caught").length
+  const relevant = results.filter((r) => r.entryMatched).length
+  const shown = results.reduce((n, r) => n + r.otherMatches, relevant)
+  return {
+    cases: results.length,
+    caught,
+    recall: results.length ? caught / results.length : 0,
+    precision: shown ? relevant / shown : 0,
+  }
+}

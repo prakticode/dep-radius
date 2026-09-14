@@ -1,0 +1,18 @@
+{
+  "package": "ws",
+  "from": "7.5.10",
+  "to": "8.0.0",
+  "repository": "https://github.com/websockets/ws",
+  "sources": {
+    "8.0.0": "https://github.com/websockets/ws/releases/tag/8.0.0"
+  },
+  "change": [
+    "Text messages and close reasons are no longer decoded to strings"
+  ],
+  "why": "Messages arrive as Buffers, so the comparison with \"ping\" is never true and clients time out. The note names the event as a string, and strings are never usage.",
+  "expect": [
+    "src/realtime/server.js:6",
+    "src/realtime/server.js:7"
+  ],
+  "status": "missed"
+}

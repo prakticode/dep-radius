@@ -1,0 +1,11 @@
+{
+  "package": "i18next",
+  "from": "22.5.1",
+  "to": "23.0.0",
+  "repository": "https://github.com/i18next/i18next",
+  "sources": { "23.0.0": "https://github.com/i18next/i18next/blob/master/CHANGELOG.md#2300" },
+  "change": ["changed returnNull default to false"],
+  "why": "Translations stored as null used to come back as null and fall through to the fallback; they now resolve as missing keys. The note names the option, the code only calls t().",
+  "expect": ["src/i18n.ts:10"],
+  "status": "missed"
+}

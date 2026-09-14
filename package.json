@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "check": "prettier --check . && turbo run lint typecheck test",
     "backtest": "pnpm --filter @dep-radius/core backtest",
+    "benchmark": "pnpm --filter @dep-radius/core benchmark",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "turbo run build --filter=./packages/* && changeset publish",

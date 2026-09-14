@@ -1,0 +1,11 @@
+{
+  "package": "jsonwebtoken",
+  "from": "8.5.1",
+  "to": "9.0.0",
+  "repository": "https://github.com/auth0/node-jsonwebtoken",
+  "sources": { "9.0.0": "https://github.com/auth0/node-jsonwebtoken/blob/master/CHANGELOG.md#900---2022-12-21" },
+  "change": ["The verify() function no longer accepts unsigned tokens by default"],
+  "why": "Sessions verified with an empty secret in development used to accept unsigned tokens and now throw.",
+  "expect": ["src/auth/session.ts:4"],
+  "status": "caught"
+}

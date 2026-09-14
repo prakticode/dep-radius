@@ -3,7 +3,8 @@ import { dirname, relative, resolve } from "node:path"
 
 const root = process.cwd()
 
-// ESLint reads the config of the package a file belongs to, so each package lints its own files.
+// ESLint reads the config of the package a file belongs to, so each package lints its own files, and
+// skips the ones that package ignores without counting them as warnings.
 function packageOf(file) {
   let dir = dirname(file)
   while (dir !== root && !existsSync(resolve(dir, "eslint.config.js")))
@@ -20,7 +21,7 @@ function lintPerPackage(files) {
   }
   return [...groups].map(
     ([dir, names]) =>
-      `pnpm --dir ${dir} exec eslint --fix --max-warnings 0 ${names.join(" ")}`
+      `pnpm --dir ${dir} exec eslint --fix --max-warnings 0 --no-warn-ignored ${names.join(" ")}`
   )
 }
 
