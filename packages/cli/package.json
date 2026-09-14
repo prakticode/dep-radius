@@ -1,6 +1,6 @@
 {
   "name": "dep-radius",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Tells you which changes in a dependency update land on code you actually wrote.",
   "license": "MIT",
   "author": "prakticode",
