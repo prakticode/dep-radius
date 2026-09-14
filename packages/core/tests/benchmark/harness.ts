@@ -150,18 +150,13 @@ function dependenciesOf(caseDir: string): FakePackage[] {
   return [...byName.values()]
 }
 
-export interface RunCaseOptions {
-  // the brief of the case's package, for a script that compares more than the score
-  onBrief?: (brief: PackageBrief) => void
-  // the JavaScript of each version, for the code hints
-  runtime?: RuntimeFiles
-}
-
-export async function runCase(
+// The fake registry a case runs against: both versions, the notes as GitHub releases, and the
+// packages whose types it imports.
+export function registryFor(
   c: BenchmarkCase,
   dir = CASES_DIR,
-  options: RunCaseOptions = {}
-): Promise<CaseResult> {
+  runtime?: RuntimeFiles
+): { registry: FakeRegistry; withTypes: boolean } {
   const caseDir = join(dir, c.id)
   const notes = notesOf(c, caseDir)
   // a case that needs the package's types ships its real declarations under package/<version>
@@ -172,8 +167,8 @@ export async function runCase(
     version,
     publishedAt: "2026-01-01T00:00:00Z",
     files: withTypes
-      ? { ...options.runtime?.[version], ...readTree(join(typesDir, version)) }
-      : (options.runtime?.[version] ?? {
+      ? { ...runtime?.[version], ...readTree(join(typesDir, version)) }
+      : (runtime?.[version] ?? {
           "package.json": JSON.stringify({
             name: c.package,
             version,
@@ -193,6 +188,25 @@ export async function runCase(
     },
     ...dependenciesOf(caseDir),
   ])
+  return { registry, withTypes }
+}
+
+export interface RunCaseOptions {
+  // the brief of the case's package, for a script that compares more than the score
+  onBrief?: (brief: PackageBrief) => void
+  // the JavaScript of each version, for the code hints
+  runtime?: RuntimeFiles
+  // change records to join with the rules' own, <name>@<version>.json files
+  recordsDir?: string
+}
+
+export async function runCase(
+  c: BenchmarkCase,
+  dir = CASES_DIR,
+  options: RunCaseOptions = {}
+): Promise<CaseResult> {
+  const caseDir = join(dir, c.id)
+  const { registry, withTypes } = registryFor(c, dir, options.runtime)
   const project = createProject({
     files: {
       "package.json": pkgJson({
@@ -212,6 +226,7 @@ export async function runCase(
     const opts = testOptions(project.root, {
       specs: [`${c.package}@${c.to}`],
       surface: withTypes,
+      ...(options.recordsDir ? { recordsDir: options.recordsDir } : {}),
     })
     const brief = await run(opts, testCtx(opts, registry))
     const pkg = brief.packages.find((p) => p.pkg === c.package)

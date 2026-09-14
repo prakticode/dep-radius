@@ -7,7 +7,13 @@ thing: does radius tie a documented behaviour change to the code it affects?
 pnpm benchmark            # the table and the totals
 pnpm benchmark --json     # the same, for a script
 pnpm benchmark --runtime  # with each version's JavaScript from npm, for the code hints
+pnpm benchmark --records <dir>  # with change records joined to the rules' own
 ```
+
+`scripts/records-benchmark.ts` asks a model for change records about the entries of the missed cases
+(the entry's text and the package's APIs only, never `case.json`), writes them to a directory
+outside the cases, and runs the benchmark with and without them. The test always runs with the rules
+alone.
 
 The cases also run with the tests (`benchmark.test.ts`). Each one records whether radius catches it
 today, so a change to matching that catches a new case, or loses one, fails the test until the case

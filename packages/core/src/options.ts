@@ -19,6 +19,8 @@ export interface Options {
   prod: boolean
   concurrency: number
   cacheDir: string
+  // a directory of change records, <name>@<version>.json, joined with the rules' own records
+  recordsDir?: string
   verbose: boolean
   now: number
   color: boolean

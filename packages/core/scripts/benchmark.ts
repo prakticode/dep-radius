@@ -2,10 +2,11 @@
 // note that changed behaviour, whether radius tied it to the lines it lands on, and how many other
 // notes a reader is shown next to it.
 //
-//   node scripts/benchmark.ts [--json] [--runtime]
+//   node scripts/benchmark.ts [--json] [--runtime] [--records <dir>]
 //
 // --runtime downloads each case's two versions from the npm registry (through the normal cache) and
 // serves their JavaScript next to the case's files, so the code hints have code to read.
+// --records (or RADIUS_BENCH_RECORDS) joins the change records of a directory with the rules' own.
 
 import { parseArgs } from "node:util"
 
@@ -26,8 +27,13 @@ import {
 } from "../tests/benchmark/harness.ts"
 
 const { values } = parseArgs({
-  options: { json: { type: "boolean" }, runtime: { type: "boolean" } },
+  options: {
+    json: { type: "boolean" },
+    runtime: { type: "boolean" },
+    records: { type: "string" },
+  },
 })
+const recordsDir = values.records ?? process.env.RADIUS_BENCH_RECORDS
 
 const ctx = createCtx({
   root: process.cwd(),
@@ -68,7 +74,12 @@ const results: CaseResult[] = []
 for (const c of loadCases()) {
   assertWellFormed(c)
   const runtime = values.runtime ? await runtimeOf(c) : undefined
-  results.push(await runCase(c, undefined, runtime ? { runtime } : {}))
+  results.push(
+    await runCase(c, undefined, {
+      ...(runtime ? { runtime } : {}),
+      ...(recordsDir ? { recordsDir } : {}),
+    })
+  )
 }
 const sum = totals(results)
 const seconds = (Date.now() - started) / 1000
