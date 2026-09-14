@@ -1,0 +1,17 @@
+{
+  "package": "body-parser",
+  "from": "2.2.2",
+  "to": "2.3.0",
+  "repository": "https://github.com/expressjs/body-parser",
+  "sources": {
+    "2.3.0": "https://github.com/expressjs/body-parser/blob/master/HISTORY.md#230--2026-06-15"
+  },
+  "change": [
+    "Invalid limit values (e.g. unparseable strings or NaN) now throw instead of being silently ignored"
+  ],
+  "why": "When MAX_BODY_BYTES is unset the limit is NaN, which used to mean no limit and now throws a TypeError when the middleware is created, so the server no longer starts.",
+  "expect": [
+    "src/server.js:7"
+  ],
+  "status": "missed"
+}

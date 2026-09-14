@@ -1,0 +1,18 @@
+{
+  "package": "vue-router",
+  "from": "5.0.6",
+  "to": "5.0.7",
+  "repository": "https://github.com/vuejs/router",
+  "sources": {
+    "5.0.7": "https://github.com/vuejs/router/releases/tag/v5.0.7"
+  },
+  "change": [
+    "Omit empty optional params from resolved params"
+  ],
+  "why": "On /blog the optional category param is now missing instead of an empty string, so the page no longer falls back to \"all\" and fetches posts for the category \"undefined\".",
+  "expect": [
+    "src/router.ts:8",
+    "src/pages/BlogList.vue:6"
+  ],
+  "status": "missed"
+}

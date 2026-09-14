@@ -1,0 +1,17 @@
+{
+  "package": "react-hook-form",
+  "from": "7.61.1",
+  "to": "7.62.0",
+  "repository": "https://github.com/react-hook-form/react-hook-form",
+  "sources": {
+    "7.62.0": "https://github.com/react-hook-form/react-hook-form/releases/tag/v7.62.0"
+  },
+  "change": [
+    "prevent onBlur for readOnly fields"
+  ],
+  "why": "The onBlur callback passed to register no longer runs for readOnly inputs, so picking a new check-in date no longer re-validates check-out and a stale \"Check-out must be after check-in\" error stays on screen.",
+  "expect": [
+    "src/bookings/StayForm.tsx:32"
+  ],
+  "status": "missed"
+}

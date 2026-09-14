@@ -1,0 +1,19 @@
+{
+  "package": "marked",
+  "from": "14.1.4",
+  "to": "15.0.0",
+  "repository": "https://github.com/markedjs/marked",
+  "sources": {
+    "15.0.0": "https://github.com/markedjs/marked/releases/tag/v15.0.0"
+  },
+  "change": [
+    "escape html in renderers instead of tokenizers for all tokens"
+  ],
+  "why": "A custom codespan renderer now receives the raw text instead of escaped text, so a comment containing `<img onerror=...>` in backticks is rendered as live HTML.",
+  "expect": [
+    "src/markdown.ts:3",
+    "src/markdown.ts:5",
+    "src/markdown.ts:12"
+  ],
+  "status": "missed"
+}

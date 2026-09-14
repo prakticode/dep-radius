@@ -1,0 +1,18 @@
+{
+  "package": "ajv",
+  "from": "7.2.4",
+  "to": "8.0.0",
+  "repository": "https://github.com/ajv-validator/ajv",
+  "sources": {
+    "8.0.0": "https://github.com/ajv-validator/ajv/releases/tag/v8.0.0"
+  },
+  "change": [
+    "controls all"
+  ],
+  "why": "strict: true now also turns on strictTypes and strictRequired, so compiling the order schema throws at startup on the union type and the required properties inside anyOf. With 7.x it only logged a warning.",
+  "expect": [
+    "src/validate.ts:3",
+    "src/validate.ts:18"
+  ],
+  "status": "missed"
+}

@@ -1,0 +1,18 @@
+{
+  "package": "ioredis",
+  "from": "4.28.5",
+  "to": "5.0.0",
+  "repository": "https://github.com/redis/ioredis",
+  "sources": {
+    "5.0.0": "https://github.com/redis/ioredis/releases/tag/v5.0.0"
+  },
+  "change": [
+    "allowUsernameInURI is removed and ioredis will always use the username passed via URI",
+    "always parse username passed via URI"
+  ],
+  "why": "The username in REDIS_URL, such as the placeholder h in redis://h:password@host, is now sent with AUTH, so a server that only has a password rejects the connection.",
+  "expect": [
+    "src/cache.js:3"
+  ],
+  "status": "missed"
+}

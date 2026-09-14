@@ -1,0 +1,17 @@
+{
+  "package": "passport",
+  "from": "0.5.3",
+  "to": "0.6.0",
+  "repository": "https://github.com/jaredhanson/passport",
+  "sources": {
+    "0.6.0": "https://github.com/jaredhanson/passport/blob/master/CHANGELOG.md#060---2022-05-20"
+  },
+  "change": [
+    "regenerate the the session and clear session information by default"
+  ],
+  "why": "Logging in regenerates the session and drops req.session.returnTo, so successReturnToOrRedirect always sends the user to / instead of the page they asked for.",
+  "expect": [
+    "src/auth.js:26"
+  ],
+  "status": "missed"
+}

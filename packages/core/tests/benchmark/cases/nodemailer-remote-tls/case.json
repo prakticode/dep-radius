@@ -1,0 +1,19 @@
+{
+  "package": "nodemailer",
+  "from": "8.0.11",
+  "to": "9.0.0",
+  "repository": "https://github.com/nodemailer/nodemailer",
+  "sources": {
+    "9.0.0": "https://github.com/nodemailer/nodemailer/releases/tag/v9.0.0"
+  },
+  "change": [
+    "now validate the server's TLS certificate by default",
+    "validate TLS certificates by default when fetching remote content"
+  ],
+  "why": "Fetching the attachment from an internal https service with a self-signed certificate now fails, so sendMail rejects and the invoice is never sent.",
+  "expect": [
+    "src/mailer.js:10",
+    "src/mailer.js:18"
+  ],
+  "status": "missed"
+}

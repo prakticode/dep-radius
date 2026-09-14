@@ -1,0 +1,17 @@
+{
+  "package": "@tanstack/react-query",
+  "from": "5.100.13",
+  "to": "5.100.14",
+  "repository": "https://github.com/TanStack/query",
+  "sources": {
+    "5.100.14": "https://github.com/TanStack/query/blob/main/packages/react-query/CHANGELOG.md#510014"
+  },
+  "change": [
+    "do not go into optimistic fetching state when not subscribed"
+  ],
+  "why": "While the tab is inactive, useQuery with subscribed: false now reports isLoading false instead of true, so the tab shows \"You have no orders yet.\" instead of the loading state.",
+  "expect": [
+    "src/orders/OrdersTab.tsx:5"
+  ],
+  "status": "missed"
+}

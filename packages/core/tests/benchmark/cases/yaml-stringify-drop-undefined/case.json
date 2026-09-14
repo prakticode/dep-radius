@@ -1,0 +1,17 @@
+{
+  "package": "yaml",
+  "from": "1.10.2",
+  "to": "2.0.0",
+  "repository": "https://github.com/eemeli/yaml",
+  "sources": {
+    "2.0.0": "https://github.com/eemeli/yaml/releases/tag/v2.0.0"
+  },
+  "change": [
+    "When creating a mapping from a JS Object, drop undefined values"
+  ],
+  "why": "Options the user did not pass used to be written as token: null; 2.0 leaves those keys out of the saved file, so reading it back gives undefined instead of null.",
+  "expect": [
+    "src/config/save.js:5"
+  ],
+  "status": "missed"
+}

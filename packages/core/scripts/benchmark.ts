@@ -27,13 +27,13 @@ if (values.json) {
   console.log(JSON.stringify({ totals: sum, results }, null, 2))
 } else {
   const width = Math.max(...results.map((r) => r.id.length))
-  console.log(`${"case".padEnd(width)}  status  sites  other notes`)
+  console.log(`${"case".padEnd(width)}  status  verdict  sites  other notes`)
   for (const r of results)
     console.log(
-      `${r.id.padEnd(width)}  ${r.status.padEnd(6)}  ${`${r.sitesFound}/${r.sitesExpected}`.padEnd(5)}  ${r.otherMatches} of ${r.entries}`
+      `${r.id.padEnd(width)}  ${r.status.padEnd(6)}  ${r.verdict.padEnd(7)}  ${`${r.sitesFound}/${r.sitesExpected}`.padEnd(5)}  ${r.otherMatches} of ${r.entries}`
     )
   const pct = (x: number) => `${Math.round(x * 100)}%`
   console.log(
-    `\n${sum.caught} of ${sum.cases} caught (recall ${pct(sum.recall)}), precision ${pct(sum.precision)}`
+    `\n${sum.caught} of ${sum.cases} caught (recall ${pct(sum.recall)}), precision ${pct(sum.precision)}, ${sum.quiet} called quiet`
   )
 }

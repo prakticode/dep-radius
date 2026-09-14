@@ -43,6 +43,9 @@ cases need the types of both versions.
 - **Recall**: the share of cases caught.
 - **Precision**: of every note a reader is shown across the cases, the share that describes the
   change. The rest is what they skim past.
+- **Called quiet**: cases whose upgrade gets the verdict quiet. Each one is a documented change to
+  code the project uses that radius would let through unread, so this count should go to zero.
+- **verdict**: the upgrade's verdict in that case.
 - **sites**: expected sites linked, out of those listed.
 - **other notes**: matched notes that are not the change, out of every entry read.
 
@@ -57,7 +60,10 @@ cases need the types of both versions.
 4. Write the smallest project that uses the package the way real code does, without adding names
    just so the note matches.
 5. Write `expect` from what the change breaks, before running radius. Only lines that use the
-   package count: radius points at calls, not at the code that reads their result.
+   package count: radius points at calls, not at the code that reads their result. A call that
+   continues a chain over several lines is reported at the chain's first line: list that line too.
+   `change` holds words from the notes; each must be in them, and at least one entry as radius
+   splits the notes must contain one (a summary bullet repeated by a detailed entry is dropped).
 6. Run `pnpm benchmark`, and set `status` to what it reports.
 
 A missed case is as useful as a caught one: it is the next thing to fix.

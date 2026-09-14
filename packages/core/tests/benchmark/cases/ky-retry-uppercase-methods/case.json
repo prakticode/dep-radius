@@ -1,0 +1,18 @@
+{
+  "package": "ky",
+  "from": "1.14.1",
+  "to": "1.14.2",
+  "repository": "https://github.com/sindresorhus/ky",
+  "sources": {
+    "1.14.2": "https://github.com/sindresorhus/ky/releases/tag/v1.14.2"
+  },
+  "change": [
+    "Fix handling of uppercase retry.methods"
+  ],
+  "why": "Uppercase retry methods used to match nothing, so no request was retried. Now GET and POST are retried, and a failed createOrder can be sent up to four times.",
+  "expect": [
+    "src/api.ts:3",
+    "src/api.ts:12"
+  ],
+  "status": "missed"
+}

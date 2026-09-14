@@ -1,0 +1,18 @@
+{
+  "package": "class-validator",
+  "from": "0.13.2",
+  "to": "0.14.0",
+  "repository": "https://github.com/typestack/class-validator",
+  "sources": {
+    "0.14.0": "https://github.com/typestack/class-validator/blob/develop/CHANGELOG.md#0140-2022-12-09"
+  },
+  "change": [
+    "enable forbidUnknownValues option by default",
+    "forbidUnknownValues option is enabled by default"
+  ],
+  "why": "validate() with options now returns an unknownValue error for an instance of a class without decorators, so every request to the preferences route is rejected with 400.",
+  "expect": [
+    "src/middleware/validate-body.ts:7"
+  ],
+  "status": "caught"
+}
