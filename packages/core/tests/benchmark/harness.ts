@@ -62,7 +62,7 @@ export function loadCases(dir = CASES_DIR): BenchmarkCase[] {
     })
 }
 
-function readTree(root: string): Record<string, string> {
+export function readTree(root: string): Record<string, string> {
   const out: Record<string, string> = {}
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
@@ -75,7 +75,7 @@ function readTree(root: string): Record<string, string> {
   return out
 }
 
-function notesOf(c: BenchmarkCase, dir: string): Record<string, string> {
+export function notesOf(c: BenchmarkCase, dir: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const version of Object.keys(c.sources))
     out[version] = readFileSync(join(dir, "notes", `${version}.md`), "utf8")
@@ -92,7 +92,7 @@ function entryText(e: NoteEntry): string {
   return squash([e.title, ...e.regions.map((r) => r.text)].join(""))
 }
 
-function describesChange(c: BenchmarkCase, e: NoteEntry): boolean {
+export function describesChange(c: BenchmarkCase, e: NoteEntry): boolean {
   const text = entryText(e)
   return c.change.some((words) => text.includes(squash(words)))
 }
