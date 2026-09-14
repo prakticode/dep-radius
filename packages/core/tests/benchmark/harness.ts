@@ -150,10 +150,17 @@ function dependenciesOf(caseDir: string): FakePackage[] {
   return [...byName.values()]
 }
 
+export interface RunCaseOptions {
+  // the brief of the case's package, for a script that compares more than the score
+  onBrief?: (brief: PackageBrief) => void
+  // the JavaScript of each version, for the code hints
+  runtime?: RuntimeFiles
+}
+
 export async function runCase(
   c: BenchmarkCase,
   dir = CASES_DIR,
-  runtime?: RuntimeFiles
+  options: RunCaseOptions = {}
 ): Promise<CaseResult> {
   const caseDir = join(dir, c.id)
   const notes = notesOf(c, caseDir)
@@ -165,8 +172,8 @@ export async function runCase(
     version,
     publishedAt: "2026-01-01T00:00:00Z",
     files: withTypes
-      ? { ...runtime?.[version], ...readTree(join(typesDir, version)) }
-      : (runtime?.[version] ?? {
+      ? { ...options.runtime?.[version], ...readTree(join(typesDir, version)) }
+      : (options.runtime?.[version] ?? {
           "package.json": JSON.stringify({
             name: c.package,
             version,
@@ -212,6 +219,7 @@ export async function runCase(
       throw new Error(
         `${c.id}: no brief for ${c.package}: ${JSON.stringify(brief.notAnalyzed)}`
       )
+    options.onBrief?.(pkg)
     return score(c, pkg)
   } finally {
     project.cleanup()
