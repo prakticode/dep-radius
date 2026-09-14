@@ -1,5 +1,13 @@
 import { UNSEEN_LABEL } from "../labels.ts"
-import type { Brief, NoteHit, PackageBrief, Site } from "../model.ts"
+import type {
+  Brief,
+  NoteEntry,
+  NoteHit,
+  NoteMatch,
+  PackageBrief,
+  Site,
+  Touched,
+} from "../model.ts"
 
 // reasons that say "the tool cannot see", as opposed to "something changed that you use"
 const UNSEEN = new Set([
@@ -44,6 +52,36 @@ export function isUnseenOnly(p: PackageBrief): boolean {
     p.reasons.every((r) => UNSEEN.has(r.code)) &&
     p.reasons.some((r) => r.code !== "no-evidence")
   )
+}
+
+export type Finding =
+  | { kind: "type"; touched: Touched }
+  | { kind: "note"; match: NoteMatch }
+  | { kind: "breaking-no-api"; entry: NoteEntry }
+
+// What a package's reader sees, most pressing first: what breaks and is tied to their code, then
+// what is tied to it, then what may break, then what may concern them. Nothing is left out, and
+// within a rank the type changes come before the notes, each in its own order.
+export function orderFindings(p: PackageBrief): Finding[] {
+  const rank = (f: Finding): number => {
+    if (f.kind === "type") {
+      if (f.touched.strength === "weak") return 3
+      return f.touched.bucket === "removed" ? 0 : 1
+    }
+    if (f.kind === "breaking-no-api") return 2
+    if (f.match.entry.breakingMarker) return f.match.direct ? 0 : 2
+    return f.match.direct ? 1 : 3
+  }
+  const all: Finding[] = [
+    ...p.surface.touched.map((touched) => ({ kind: "type" as const, touched })),
+    ...p.notes.matched.map((match) => ({ kind: "note" as const, match })),
+    ...p.notes.unattributedBreaking.map((entry) => ({
+      kind: "breaking-no-api" as const,
+      entry,
+    })),
+  ]
+  // Array.prototype.sort is stable: equal ranks keep the order above
+  return all.sort((a, b) => rank(a) - rank(b))
 }
 
 // What ties a note to the code: names the code uses, and options of the calls it makes, which a

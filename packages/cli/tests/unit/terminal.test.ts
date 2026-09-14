@@ -139,6 +139,69 @@ describe("renderTerminal", () => {
     expect(text).toContain("acme-cli 1.0.0 → 1.1.0")
   })
 
+  it("shows a breaking note tied to the code before a change matched by member name", () => {
+    const review = pkg({
+      pkg: "acme-mixed",
+      verdict: "review",
+      surface: {
+        status: "computed",
+        changes: 1,
+        touched: [
+          {
+            change: {
+              path: "acme-mixed:Ctx#issues",
+              kind: "member",
+              alsoAt: [],
+            },
+            bucket: "changed",
+            strength: "weak",
+            sites: [site("src/a.test.ts", 5)],
+          },
+        ],
+      },
+      notes: {
+        coverage: "complete",
+        perVersion: [],
+        total: 2,
+        matched: [
+          {
+            entry: {
+              id: "a",
+              version: "1.1.0",
+              title: "⚠️ String length counts code points",
+              headingPath: [],
+              regions: [],
+              breakingMarker: true,
+              noise: false,
+              refs: [],
+            },
+            hits: [{ name: "max", strength: "strong", region: "inline-code" }],
+            direct: true,
+          },
+        ],
+        unattributedBreaking: [],
+      },
+      usage: {
+        files: 1,
+        sites: [],
+        byName: { max: [site("src/schema.ts", 4)] },
+        strongNames: ["max"],
+        weakNames: [],
+        opaque: [],
+        blindSpots: [],
+      },
+    })
+    const out = renderTerminal(
+      { ...brief, packages: [review] },
+      { color: false, verbose: false, now: NOW }
+    )
+    expect(out.indexOf("String length counts code points")).toBeGreaterThan(-1)
+    expect(out.indexOf("String length counts code points")).toBeLessThan(
+      out.indexOf("acme-mixed:Ctx#issues")
+    )
+    expect(out).toContain("src/schema.ts:4")
+  })
+
   it("ends with the limits and a one-line summary", () => {
     expect(text).toContain("Transitive dependencies are out of scope.")
     expect(text.trimEnd().split("\n").at(-1)).toBe(
