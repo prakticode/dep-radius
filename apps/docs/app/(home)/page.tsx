@@ -200,7 +200,7 @@ export default function HomePage() {
             When radius can&apos;t link a change to your code, it says review,
             never quiet.
           </Stat>
-          <Stat value="24 of 51" label="found at the exact line">
+          <Stat value="25 of 51" label="found at the exact line">
             For the others, radius still says review. It just can&apos;t point
             at the line.
           </Stat>

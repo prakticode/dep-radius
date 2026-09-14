@@ -81,7 +81,7 @@ can't prove it doesn't affect you, so it shows it. About one update in ten is qu
 
 **Does it work?** On
 [51 real release notes that changed behaviour](https://depradius.com/docs/benchmark), it found the
-exact line for 24, and called none of them quiet by mistake. Every miss is listed.
+exact line for 25, and called none of them quiet by mistake. Every miss is listed.
 
 **What does it need?** Nothing: `npx dep-radius`. No account, no config. npm, pnpm, Yarn, Bun,
 monorepos, private registries. Three direct dependencies, published with npm provenance. MIT.

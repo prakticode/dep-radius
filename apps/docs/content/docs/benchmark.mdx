@@ -24,9 +24,9 @@ removed function is caught by the type check, so it's not tested here.
 
 | Question                                                        | Answer                    |
 | --------------------------------------------------------------- | ------------------------- |
-| How many changes does radius find at the exact line?            | **24 of 51** (47%)        |
+| How many changes does radius find at the exact line?            | **25 of 51** (49%)        |
 | How many does it wrongly call quiet?                            | **0 of 51**               |
-| Of the notes it shows, how many are the change being tested?    | 38%                       |
+| Of the notes it shows, how many are the change being tested?    | 39%                       |
 
 The 51 cases were added in three rounds:
 
@@ -34,10 +34,10 @@ The 51 cases were added in three rounds:
 | ------------------------------------------------------------ | ----- | ----- |
 | First 14, written while building radius                      | 14    | 12    |
 | Next 25, written without running radius on them first        | 25    | 10    |
-| Last 12, added later to check the fixes, same rule           | 12    | 2     |
+| Last 12, added later to check the fixes, same rule           | 12    | 3     |
 
 The first round was too easy: it was written by someone who knew how radius works. **Rounds 2 and 3
-are the fair score: 12 of 37, about one in three.**
+are the fair score: 13 of 37, about one in three.**
 
 ## Quiet: from 13 mistakes to 0
 
@@ -67,6 +67,10 @@ The three fixes:
 
 On the last 12 cases, these fixes found only 2.
 
+Since then, radius also reads the options a class takes when it's constructed, including options one
+level down, like `new XMLParser({ numberParseOptions: { eNotation } })`. That found `fast-xml-parser`,
+the third of the last 12.
+
 ## Found
 
 | Package           | Upgrade          | The change                                              |
@@ -77,6 +81,7 @@ On the last 12 cases, these fixes found only 2.
 | `date-fns`        | 3.3.0 → 3.3.1    | `getISOWeek` rounds again instead of truncating         |
 | `dotenv`          | 16.6.1 → 17.0.0  | `quiet` defaults to false: `config()` logs at startup   |
 | `express`         | 4.21.2 → 5.0.0   | `res.redirect('back')` is no longer a magic string      |
+| `fast-xml-parser` | 4.0.15 → 4.1.0   | `eNotation` in `new XMLParser()` defaults to true        |
 | `express`         | 4.21.2 → 5.0.0   | `res.status()` only accepts integers                    |
 | `helmet`          | 7.2.0 → 8.0.0    | CSP directives like `self` must be quoted               |
 | `helmet`          | 7.2.0 → 8.0.0    | `Strict-Transport-Security` max-age is 365 days         |
@@ -123,14 +128,13 @@ The note doesn't name anything the code uses. This is the most common reason.
 ### 2. radius can't see the option
 
 The note names an option, but radius can't tell that the code's call uses it. For example, the
-option is defined in another package, or written as a link, or passed to a constructor.
+option is written as a link or in words, or its types come from a separate `@types` package.
 
 | Package                 | Upgrade              | The option                                     |
 | ----------------------- | -------------------- | ---------------------------------------------- |
-| `@tanstack/react-query` | 5.100.13 → 5.100.14  | "not subscribed", in words, declared in `query-core` |
+| `@tanstack/react-query` | 5.100.13 → 5.100.14  | `subscribed`, written in words: "not subscribed" |
 | `ajv`                   | 7.2.4 → 8.0.0        | `strict`, written as a link, not as code       |
 | `axios`                 | 1.15.2 → 1.16.0      | `maxContentLength` on the fetch adapter        |
-| `fast-xml-parser`       | 4.0.15 → 4.1.0       | `eNotation`, an option of `new XMLParser()`    |
 | `ioredis`               | 4.28.5 → 5.0.0       | `allowUsernameInURI`, types from `@types`      |
 | `nodemailer`            | 8.0.11 → 9.0.0       | `tls`, types from `@types`                     |
 | `qs`                    | 6.14.0 → 6.14.1      | `arrayLimit`, types from `@types`              |
@@ -163,8 +167,8 @@ The note names something from another package, or a value inside a string.
   radius links a change to the code, not how common changes are.
 - **How it does on big projects.** The test projects are small. A big project uses a package in more
   places, so more notes match, including by accident.
-- **What happens on a miss.** A miss still gets review. In 23 of the 27 misses, the note is listed
-  among the notes radius couldn't link. In the other 4, other notes cause the review. What a miss
+- **What happens on a miss.** A miss still gets review. In 23 of the 26 misses, the note is listed
+  among the notes radius couldn't link. In the other 3, other notes cause the review. What a miss
   loses is the exact line.
 - **Changes nobody wrote down.** No tool that reads release notes can see them. Your tests can.
 
