@@ -1,0 +1,17 @@
+{
+  "package": "react-router",
+  "from": "7.8.1",
+  "to": "7.8.2",
+  "repository": "https://github.com/remix-run/react-router",
+  "sources": {
+    "7.8.2": "https://github.com/remix-run/react-router/blob/main/packages/react-router/CHANGELOG.md#782"
+  },
+  "change": [
+    "Properly escape interpolated param values in generatePath()"
+  ],
+  "why": "generatePath now percent-encodes the param itself, so the already encoded query is encoded twice: searching \"rock & roll\" goes to /search/rock%2520%2526%2520roll and the page shows \"rock%20%26%20roll\".",
+  "expect": [
+    "src/search/SearchBox.tsx:13"
+  ],
+  "status": "caught"
+}

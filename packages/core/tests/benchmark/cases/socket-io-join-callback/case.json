@@ -1,0 +1,18 @@
+{
+  "package": "socket.io",
+  "from": "2.3.0",
+  "to": "3.0.0",
+  "repository": "https://github.com/socketio/socket.io",
+  "sources": {
+    "3.0.0": "https://github.com/socketio/socket.io/releases/tag/3.0.0"
+  },
+  "change": [
+    "Socket#join() and Socket#leave() do not accept a callback argument anymore",
+    "make Socket#join() and Socket#leave() synchronous"
+  ],
+  "why": "join() ignores its callback, so the joined event is never emitted to the room.",
+  "expect": [
+    "src/realtime.js:9"
+  ],
+  "status": "caught"
+}

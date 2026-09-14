@@ -1,0 +1,17 @@
+{
+  "package": "semver",
+  "from": "7.6.3",
+  "to": "7.7.0",
+  "repository": "https://github.com/npm/node-semver",
+  "sources": {
+    "7.7.0": "https://github.com/npm/node-semver/releases/tag/v7.7.0"
+  },
+  "change": [
+    "add identifier validation to inc()"
+  ],
+  "why": "A canary build on a branch like feature/login used to get 1.4.1-feature/login.0; inc() now rejects the identifier and returns null, so the script prints null as the version.",
+  "expect": [
+    "scripts/canary-version.js:4"
+  ],
+  "status": "caught"
+}

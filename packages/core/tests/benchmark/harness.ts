@@ -32,6 +32,8 @@ export interface CaseResult {
   id: string
   package: string
   status: "caught" | "missed"
+  // the upgrade's verdict: quiet on a case is an upgrade radius would let through unread
+  verdict: PackageBrief["verdict"]
   // the change's entry matched at all, even without reaching an expected line
   entryMatched: boolean
   sitesFound: number
@@ -75,27 +77,35 @@ function notesOf(c: BenchmarkCase, dir: string): Record<string, string> {
   return out
 }
 
-// The words of an entry as a reader sees them, backticks and line breaks gone.
+// The words of an entry, compared without what markdown and entry splitting put around them:
+// backticks, emphasis and spacing ("**Fetch adapter**", "NaN )").
+function squash(text: string): string {
+  return text.replace(/[`*_\s]/g, "")
+}
+
 function entryText(e: NoteEntry): string {
-  return [e.title, ...e.regions.map((r) => r.text)]
-    .join(" ")
-    .replace(/`/g, "")
-    .replace(/\s+/g, " ")
+  return squash([e.title, ...e.regions.map((r) => r.text)].join(""))
 }
 
 function describesChange(c: BenchmarkCase, e: NoteEntry): boolean {
   const text = entryText(e)
-  return c.change.some((words) => text.includes(words))
+  return c.change.some((words) => text.includes(squash(words)))
 }
 
-// A case whose change is in no entry of its own notes measures nothing: fail loudly instead.
+// A case whose change is in no entry of its own notes measures nothing: fail loudly instead. Every
+// set of words must be in the notes, and at least one in an entry as radius splits them (a summary
+// bullet repeated by a detailed entry is dropped as a duplicate).
 export function assertWellFormed(c: BenchmarkCase, dir = CASES_DIR): void {
-  const entries = Object.entries(notesOf(c, join(dir, c.id))).flatMap(
-    ([version, body]) => splitEntries(version, body)
-  )
+  const notes = notesOf(c, join(dir, c.id))
+  const all = squash(Object.values(notes).join(""))
   for (const words of c.change)
-    if (!entries.some((e) => entryText(e).includes(words)))
-      throw new Error(`${c.id}: no entry contains "${words}"`)
+    if (!all.includes(squash(words)))
+      throw new Error(`${c.id}: the notes do not contain "${words}"`)
+  const entries = Object.entries(notes).flatMap(([version, body]) =>
+    splitEntries(version, body)
+  )
+  if (!entries.some((e) => describesChange(c, e)))
+    throw new Error(`${c.id}: no entry of the notes describes the change`)
 }
 
 export async function runCase(
@@ -177,6 +187,7 @@ function score(c: BenchmarkCase, pkg: PackageBrief): CaseResult {
     id: c.id,
     package: c.package,
     status: sitesFound > 0 ? "caught" : "missed",
+    verdict: pkg.verdict,
     entryMatched: changeMatches.length > 0,
     sitesFound,
     sitesExpected: c.expect.length,
@@ -191,6 +202,8 @@ export interface Totals {
   recall: number
   // of all the entries a reader is shown across the cases, the share that is the change
   precision: number
+  // cases called quiet: a documented change to code the project uses, let through unread
+  quiet: number
 }
 
 export function totals(results: CaseResult[]): Totals {
@@ -202,5 +215,6 @@ export function totals(results: CaseResult[]): Totals {
     caught,
     recall: results.length ? caught / results.length : 0,
     precision: shown ? relevant / shown : 0,
+    quiet: results.filter((r) => r.verdict === "quiet").length,
   }
 }

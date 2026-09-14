@@ -1,0 +1,20 @@
+{
+  "package": "marked",
+  "from": "7.0.5",
+  "to": "8.0.0",
+  "repository": "https://github.com/markedjs/marked",
+  "sources": {
+    "8.0.0": "https://github.com/markedjs/marked/releases/tag/v8.0.0"
+  },
+  "change": [
+    "remove deprecated options",
+    "deprecated options removed"
+  ],
+  "why": "headerIds and headerPrefix are silently ignored, so rendered headings lose their id attributes and every in-page anchor link to a section stops working. The note never names the options.",
+  "expect": [
+    "src/docs/render.js:3",
+    "src/docs/render.js:5",
+    "src/docs/render.js:11"
+  ],
+  "status": "missed"
+}

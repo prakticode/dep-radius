@@ -1,0 +1,17 @@
+{
+  "package": "date-fns",
+  "from": "3.3.0",
+  "to": "3.3.1",
+  "repository": "https://github.com/date-fns/date-fns",
+  "sources": {
+    "3.3.1": "https://github.com/date-fns/date-fns/releases/tag/v3.3.1"
+  },
+  "change": [
+    "Fixed functions incorrectly using trunc instead of round"
+  ],
+  "why": "getISOWeek returns a week number one higher for dates after the spring daylight saving shift, so weekly report keys computed on 3.3.0 no longer match the ones computed now.",
+  "expect": [
+    "src/reports/weekly.ts:4"
+  ],
+  "status": "caught"
+}

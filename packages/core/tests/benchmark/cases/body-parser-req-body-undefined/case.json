@@ -1,0 +1,19 @@
+{
+  "package": "body-parser",
+  "from": "1.20.3",
+  "to": "2.0.0",
+  "repository": "https://github.com/expressjs/body-parser",
+  "sources": {
+    "2.0.0": "https://github.com/expressjs/body-parser/blob/master/HISTORY.md#200--2024-09-10"
+  },
+  "change": [
+    "req.body is no longer always initialized to {}",
+    "it is left undefined unless a body is parsed"
+  ],
+  "why": "A POST sent without a body or with another content type leaves req.body undefined instead of {}, so reading req.body.reason throws and the route answers 500.",
+  "expect": [
+    "src/app.js:6",
+    "src/app.js:7"
+  ],
+  "status": "missed"
+}

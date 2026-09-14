@@ -1,0 +1,17 @@
+{
+  "package": "tailwind-merge",
+  "from": "3.6.0",
+  "to": "3.7.0",
+  "repository": "https://github.com/dcastil/tailwind-merge",
+  "sources": {
+    "3.7.0": "https://github.com/dcastil/tailwind-merge/releases/tag/tailwind-merge%403.7.0"
+  },
+  "change": [
+    "Fix axis shorthands like px not overriding logical sides like ps"
+  ],
+  "why": "twMerge now drops ps-2 pe-3 when a caller passes px-1.5, where both used to be kept, so a badge that kept its ps-2 pe-3 padding now gets px-1.5.",
+  "expect": [
+    "src/components/Badge.tsx:8"
+  ],
+  "status": "missed"
+}

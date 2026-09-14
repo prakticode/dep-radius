@@ -1,0 +1,17 @@
+{
+  "package": "semver",
+  "from": "7.6.3",
+  "to": "7.7.0",
+  "repository": "https://github.com/npm/node-semver",
+  "sources": {
+    "7.7.0": "https://github.com/npm/node-semver/releases/tag/v7.7.0"
+  },
+  "change": [
+    "diff: fix prerelease to stable version diff logic"
+  ],
+  "why": "diff() from a prerelease to a stable version returned patch whenever the stable version had a patch number, so 1.4.0-beta.2 to 2.3.5 was auto-updated; it now returns major and the update is held back.",
+  "expect": [
+    "src/updater.js:5"
+  ],
+  "status": "missed"
+}

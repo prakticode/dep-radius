@@ -1,0 +1,20 @@
+{
+  "package": "axios",
+  "from": "1.15.2",
+  "to": "1.16.0",
+  "repository": "https://github.com/axios/axios",
+  "sources": {
+    "1.16.0": "https://github.com/axios/axios/releases/tag/v1.16.0"
+  },
+  "change": [
+    "Fetch adapter now enforces maxBodyLength and maxContentLength",
+    "Enforced maxBodyLength / maxContentLength in the fetch adapter",
+    "Enforced maxBodyLength / maxContentLength in the fetch adapter"
+  ],
+  "why": "maxContentLength was ignored with the fetch adapter and is now enforced, so downloading an avatar larger than 2 MB rejects instead of returning the data.",
+  "expect": [
+    "src/avatars.ts:3",
+    "src/avatars.ts:10"
+  ],
+  "status": "missed"
+}

@@ -5,3 +5,5 @@ coverage
 .turbo
 /notes/
 CLAUDE.local.md
+# benchmark cases copy published packages verbatim, build folders included
+!packages/core/tests/benchmark/cases/**/dist

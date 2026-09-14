@@ -1,0 +1,17 @@
+{
+  "package": "luxon",
+  "from": "3.2.1",
+  "to": "3.3.0",
+  "repository": "https://github.com/moment/luxon",
+  "sources": {
+    "3.3.0": "https://github.com/moment/luxon/blob/master/CHANGELOG.md#330-2023-03-03"
+  },
+  "change": [
+    "Fix off-by-one in Interval#count"
+  ],
+  "why": "count(\"days\") no longer counts the end date when it falls on midnight, so a leave request from the 1st to the 3rd is two days instead of three.",
+  "expect": [
+    "src/leave/days.js:6"
+  ],
+  "status": "caught"
+}
