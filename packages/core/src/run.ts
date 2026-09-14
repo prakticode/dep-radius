@@ -182,19 +182,24 @@ export async function run(
           }))
         : Promise.resolve(disabled),
     ])
+    const {
+      blindSpots: surfaceBlind,
+      options: typedOptions,
+      ...surfaceOut
+    } = surface
+    // with types, the options a call accepts; without, the keys the code passes are the only clue
+    const optionSites =
+      surface.status === "computed"
+        ? (typedOptions ?? {})
+        : (usage?.passedOptions ?? {})
     const match = notes
       ? matchNotes(
           notes.entries,
           usage?.strongNames ?? [],
           usage?.weakNames ?? [],
-          { accepted: Object.keys(surface.options ?? {}) }
+          { accepted: Object.keys(optionSites) }
         )
       : undefined
-    const {
-      blindSpots: surfaceBlind,
-      options: optionSites,
-      ...surfaceOut
-    } = surface
     const merged =
       usage && surfaceBlind
         ? { ...usage, blindSpots: [...usage.blindSpots, ...surfaceBlind] }
@@ -208,7 +213,7 @@ export async function run(
         notes,
         match,
         notesDisabled: !opts.notes,
-        optionSites: optionSites ?? {},
+        optionSites,
       })
     )
   }

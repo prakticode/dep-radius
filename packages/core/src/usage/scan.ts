@@ -94,6 +94,9 @@ export async function scanUsage(
       files: existing?.files ?? 0,
       blindSpots: existing?.blindSpots ?? [],
       opaque: counted(merged),
+      ...(existing?.passedOptions
+        ? { passedOptions: existing.passedOptions }
+        : {}),
     }
   }
   return { scannedFiles: linked.scannedFiles, packages, global: linked.global }

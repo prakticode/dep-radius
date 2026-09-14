@@ -13,5 +13,5 @@
   "expect": [
     "src/db.js:3"
   ],
-  "status": "missed"
+  "status": "caught"
 }

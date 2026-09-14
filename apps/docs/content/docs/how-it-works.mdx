@@ -90,9 +90,14 @@ examples of a quarter of all entries, only its mentions outside examples count, 
 
 A note can also name an option rather than a function: "Default `quiet` to false". When the types
 were read, radius knows the options each function you call accepts, so that note lands on your
-`dotenv.config()` call even though the code never passes `quiet`. An option matches only when it is
-written as code (`quiet`, `returnNull`) or as the header it sets (`Content-Security-Policy` for
-`contentSecurityPolicy`), and these matches are marked "possibly". The types only tell which options
+`dotenv.config()` call even though the code never passes `quiet`. Without types, the keys your code passes
+(`bodyParser.json({ limit })`) are the options radius knows. An option matches only when it is
+written as code (`quiet`, `returnNull`, or a path into it like `retry.methods`) or as the header it
+sets (`Content-Security-Policy` for `contentSecurityPolicy`), and these matches are marked
+"possibly".
+
+A commit title that starts with an API, `diff: fix prerelease to stable` or `fix(diff): ...`, names
+that API even when the rest is plain words. The types only tell which options
 exist here: they never make a note count as more, or less, than a note.
 
 </Step>

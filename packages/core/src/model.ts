@@ -184,6 +184,9 @@ export interface PackageUsage {
   files: number
   opaque: Counted<OpaqueKind>[]
   blindSpots: Counted<BlindSpotKind>[]
+  // the keys of objects the code passes to the package's calls, with the calls: the option names
+  // known without types
+  passedOptions?: Record<string, Site[]>
 }
 
 export interface UsageMap {

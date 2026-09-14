@@ -13,5 +13,5 @@
   "expect": [
     "src/server.js:7"
   ],
-  "status": "missed"
+  "status": "caught"
 }

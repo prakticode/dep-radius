@@ -68,10 +68,13 @@ export interface FileFacts {
   nonLiteralImport: Pos[]
   prefixImports: { prefix: string; pos: Pos }[]
   stringLiterals: { value: string; pos: Pos }[]
+  // the keys of object literals passed to the calls of a reference, by the reference's position:
+  // `bodyParser.json({ limit })` passes `limit`
+  passedKeys: { line: number; col: number; keys: string[] }[]
   unparseable: boolean
 }
 
-export const SCANNER_VERSION = 2
+export const SCANNER_VERSION = 3
 
 export function parseSource(src: SourceText): FileFacts {
   const facts: FileFacts = {
@@ -86,6 +89,7 @@ export function parseSource(src: SourceText): FileFacts {
     nonLiteralImport: [],
     prefixImports: [],
     stringLiterals: [],
+    passedKeys: [],
     unparseable: false,
   }
   for (const block of src.blocks) parseBlock(src.rel, block, facts)
@@ -322,11 +326,11 @@ function parseBlock(
       isReferencePosition(node)
     ) {
       const ref = climb(node)
-      facts.references.push({
-        local: node.text,
-        ...withoutBenign(ref),
-        pos: pos(node),
-      })
+      const at = pos(node)
+      const { passed, ...rest } = withoutBenign(ref)
+      facts.references.push({ local: node.text, ...rest, pos: at })
+      if (passed.length > 0)
+        facts.passedKeys.push({ line: at.line, col: at.col, keys: passed })
       if (ref.derivedInto) derived.set(ref.derivedInto, true)
       for (const cb of ref.callbackInto ?? []) derived.set(cb, true)
     } else if (ts.isCallExpression(node)) {
@@ -375,6 +379,10 @@ function parseBlock(
     while (ts.isParenthesizedExpression(cur.parent)) cur = cur.parent
     const r = climbFrom(cur)
     const binding: Binding = isImport ? { kind: "namespace" } : { kind: "cjs" }
+    if (r.passed.length > 0) {
+      const at = pos(node)
+      facts.passedKeys.push({ line: at.line, col: at.col, keys: r.passed })
+    }
     const parent = cur.parent
     if (
       r.chain.length === 0 &&
@@ -429,6 +437,14 @@ function parseBlock(
       ) {
         const r = climbFrom(node)
         if (r.chain.length > 0 || r.callSelf) {
+          if (r.passed.length > 0) {
+            const at = pos(node)
+            facts.passedKeys.push({
+              line: at.line,
+              col: at.col,
+              keys: r.passed,
+            })
+          }
           facts.references.push({
             local: node.text,
             chain: r.chain,
@@ -460,6 +476,7 @@ interface Climb {
   callbackInto?: string[]
   // bare use that does not hide which member is used: JSX tag, class heritage, typeof import, export specifier
   benign: boolean
+  passed: string[]
 }
 
 function climbFrom(start: ts.Node): Climb {
@@ -469,6 +486,7 @@ function climbFrom(start: ts.Node): Climb {
   let computed = false
   let benign = false
   const callbacks: string[] = []
+  const passed = new Set<string>()
   let cur: ts.Node = start
   for (;;) {
     const p: ts.Node = cur.parent
@@ -500,10 +518,16 @@ function climbFrom(start: ts.Node): Climb {
       (ts.isCallExpression(p) || ts.isNewExpression(p)) &&
       p.expression === cur
     ) {
-      for (const arg of p.arguments ?? [])
+      for (const arg of p.arguments ?? []) {
         if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg))
           for (const param of arg.parameters)
             callbacks.push(...bindingNames(param.name))
+        if (ts.isObjectLiteralExpression(arg))
+          for (const prop of arg.properties) {
+            const name = prop.name && propertyName(prop.name)
+            if (name) passed.add(name)
+          }
+      }
       const last = chain[chain.length - 1]
       const construct = ts.isNewExpression(p)
       if (last) {
@@ -569,9 +593,18 @@ function climbFrom(start: ts.Node): Climb {
     typeOnly,
     computed,
     benign,
+    passed: [...passed],
     ...(derivedInto ? { derivedInto } : {}),
     ...(callbacks.length > 0 ? { callbackInto: [...new Set(callbacks)] } : {}),
   }
+}
+
+function propertyName(name: ts.PropertyName): string | undefined {
+  return ts.isIdentifier(name) ||
+    ts.isStringLiteral(name) ||
+    ts.isNoSubstitutionTemplateLiteral(name)
+    ? name.text
+    : undefined
 }
 
 function withoutBenign<T extends { benign: boolean }>(r: T): Omit<T, "benign"> {

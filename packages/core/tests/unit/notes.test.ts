@@ -158,6 +158,7 @@ describe("matchNotes with the options of calls you make", () => {
       "- **Breaking:** `Strict-Transport-Security` now has a max-age of 365 days",
       "- `path: string[]` is accepted",
       "- `h` and `s` values are rounded",
+      "- Fix handling of uppercase `retry.methods`",
       "### Examples",
       "```js\nconfig({ quiet: true })\n```",
     ].join("\n")
@@ -180,6 +181,9 @@ describe("matchNotes with the options of calls you make", () => {
       ["changed returnNull default to false", ["returnNull (option)"]],
       ["path: string[] is accepted", ["path (option)"]],
     ])
+    expect(titles(["retry"])).toEqual([
+      ["Fix handling of uppercase retry.methods", ["retry (option)"]],
+    ])
   })
 
   it("never matches an option from prose words, examples or a single letter", () => {
@@ -188,6 +192,30 @@ describe("matchNotes with the options of calls you make", () => {
 
   it("leaves a name the code uses to the usual rules", () => {
     expect(titles(["quiet"], ["quiet"])).toEqual([])
+  })
+})
+
+describe("matchNotes with commit titles", () => {
+  it("reads a title that starts with the API it changes as naming it", () => {
+    const entries = splitEntries(
+      "7.7.0",
+      [
+        "- d588e37 #755 diff: fix prerelease to stable version diff logic",
+        "- fix(inc): validate identifiers",
+        "- fix: diff docs",
+        "- gt: faster",
+      ].join("\n")
+    )
+    const m = matchNotes(entries, ["diff", "inc", "gt"], [])
+    expect(
+      m.matched.map((x) => [x.entry.title, x.hits.map((h) => h.name)])
+    ).toEqual([
+      [
+        "d588e37 #755 diff: fix prerelease to stable version diff logic",
+        ["diff"],
+      ],
+      ["fix(inc): validate identifiers", ["inc"]],
+    ])
   })
 })
 
