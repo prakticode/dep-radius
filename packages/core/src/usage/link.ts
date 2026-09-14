@@ -643,8 +643,19 @@ export async function link(
   for (const s of input.globalSkipped)
     note(globalCounts, "skipped-generated", s)
 
+  const passedAt = new Map<string, string[]>()
+  for (const [rel, f] of facts)
+    for (const p of f.passedKeys ?? [])
+      passedAt.set(`${rel}:${p.line}:${p.col}`, p.keys)
+
   const packages: Record<string, PackageUsage> = {}
   for (const [id, a] of acc) {
+    const passed = new Map<string, Site[]>()
+    for (const r of a.refs)
+      for (const key of passedAt.get(
+        `${r.site.file}:${r.site.line}:${r.site.col}`
+      ) ?? [])
+        note(passed, key, r.site)
     const strong = new Set<string>()
     const weak = new Set<string>()
     for (const r of a.refs) {
@@ -662,6 +673,7 @@ export async function link(
       files: new Set(a.refs.map((r) => r.site.file)).size,
       opaque: counted(a.opaque),
       blindSpots: counted(a.blind),
+      ...(passed.size > 0 ? { passedOptions: Object.fromEntries(passed) } : {}),
     }
   }
   return {

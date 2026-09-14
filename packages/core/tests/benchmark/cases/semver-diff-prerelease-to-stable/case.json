@@ -13,5 +13,5 @@
   "expect": [
     "src/updater.js:5"
   ],
-  "status": "missed"
+  "status": "caught"
 }

@@ -97,6 +97,20 @@ describe("parse: bindings", () => {
   })
 })
 
+describe("parse: keys passed to calls", () => {
+  it("records the keys of object literals passed along a chain, by the reference", () => {
+    const f = facts(`
+      const bodyParser = require("body-parser")
+      app.use(bodyParser.json({ limit: max, "type": "json" }))
+      const pool = new Pool({ ssl, [computed]: 1, ...rest })
+      bodyParser.text()
+    `)
+    expect(f.passedKeys).toEqual([
+      { line: 3, col: 15, keys: ["limit", "type"] },
+    ])
+  })
+})
+
 describe("parse: references", () => {
   it("climbs member chains and marks the first call", () => {
     expect(

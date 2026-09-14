@@ -14,5 +14,5 @@
     "src/api.ts:3",
     "src/api.ts:12"
   ],
-  "status": "missed"
+  "status": "caught"
 }

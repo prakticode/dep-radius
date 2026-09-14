@@ -47,23 +47,36 @@ export interface MatchOptions {
 }
 
 // An option is named in a note's words or code spans, never in its examples: as a code-shaped
-// token (`returnNull`), as a whole code span (`quiet`, `quiet: true`), or as the header it sets
-// (`Content-Security-Policy` for contentSecurityPolicy).
+// token (`returnNull`), as a whole code span (`quiet`, `quiet: true`) or the path to one of its own
+// options (`retry.methods`), or as the header it sets (`Content-Security-Policy` for
+// contentSecurityPolicy).
 function optionHit(name: string, e: NoteEntry): RegionKind | undefined {
   const token = new RegExp(`(?<![\\w$-])${escape(name)}(?![\\w$-])`)
   const span = new RegExp(
     `^\\s*\\{?\\s*${escape(name)}\\s*(?:[?:=].*)?\\}?\\s*$`
   )
+  const nested = new RegExp(`^\\s*${escape(name)}(?:\\.[\\w$]+)+\\s*$`)
   for (const r of e.regions) {
     if (r.kind === "code-block") continue
     if (isCodeShaped(name) && token.test(r.text)) return r.kind
-    if (r.kind === "inline-code" && span.test(r.text)) return r.kind
+    if (r.kind === "inline-code" && (span.test(r.text) || nested.test(r.text)))
+      return r.kind
     for (const header of r.text.match(
       /[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+/g
     ) ?? [])
       if (camelCase(header) === name) return r.kind
   }
   return undefined
+}
+
+// A commit title that starts with the API it changes, `diff: fix prerelease to stable` or
+// `fix(diff): ...`, names that API even when the rest is plain words.
+function scopeOf(e: NoteEntry): string | undefined {
+  const title = e.title
+    .replace(/^[0-9a-f]{7,40}\s+/, "")
+    .replace(/^(?:#\d+\s+)+/, "")
+  const m = /^(?:[a-z]+\(([\w$./-]+)\)!?|([\w$]+)):\s/.exec(title)
+  return m?.[1] ?? m?.[2]
 }
 
 function camelCase(header: string): string {
@@ -114,9 +127,11 @@ export function matchNotes(
   const unattributedBreaking: NoteEntry[] = []
   for (const e of live) {
     const hits: NoteHit[] = []
+    const scope = scopeOf(e)
     for (const n of names) {
-      let hitRegion: RegionKind | undefined
-      for (const r of e.regions) {
+      let hitRegion: RegionKind | undefined =
+        n.name.length >= 3 && n.name === scope ? "title" : undefined
+      for (const r of hitRegion ? [] : e.regions) {
         if (
           r.kind === "code-block" &&
           // demotion never silences a breaking entry: one whose only link to the code is its example
