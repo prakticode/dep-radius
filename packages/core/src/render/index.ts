@@ -4,11 +4,13 @@
 export {
   ago,
   coverageLabel,
+  type Finding,
   groupBriefs,
   type Groups,
   isUnseenOnly,
   oneNetOnly,
   opaqueLabel,
+  orderFindings,
   sinceLabel,
   siteLabel,
   sitesFor,

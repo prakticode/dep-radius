@@ -5,6 +5,7 @@ import {
   groupBriefs,
   oneNetOnly,
   opaqueLabel,
+  orderFindings,
   sinceLabel,
   siteLabel,
   sitesFor,
@@ -64,28 +65,33 @@ function section(p: PackageBrief, now: number): string[] {
     `Published ${ago(p.publishedAt, now)} · ${coverageLabel(p)} · used in ${p.usage.files} files`
   )
   lines.push("")
-  for (const t of p.surface.touched) {
-    lines.push(
-      `- **${t.bucket}** \`${t.change.path}\`${t.strength === "weak" ? " (by member name)" : ""}`
-    )
-    for (const s of t.sites.slice(0, 5)) lines.push(`  - \`${siteLabel(s)}\``)
+  for (const f of orderFindings(p)) {
+    if (f.kind === "type") {
+      const t = f.touched
+      lines.push(
+        `- **${t.bucket}** \`${t.change.path}\`${t.strength === "weak" ? " (by member name)" : ""}`
+      )
+      for (const s of t.sites.slice(0, 5)) lines.push(`  - \`${siteLabel(s)}\``)
+    } else if (f.kind === "note") {
+      const m = f.match
+      const names = [...new Set(m.hits.map((h) => h.name))]
+      lines.push(
+        `- ${m.entry.version}: ${m.entry.title}${m.direct ? "" : " _(possibly)_"}. ${capitalize(usedLabel(m.hits, (n) => `\`${n}\``))}`
+      )
+      const strong = m.hits
+        .filter((h) => h.strength === "strong")
+        .map((h) => h.name)
+      for (const s of sitesFor(p, strong.length > 0 ? strong : names).slice(
+        0,
+        m.direct ? 3 : 1
+      ))
+        lines.push(`  - \`${siteLabel(s)}\``)
+    } else {
+      lines.push(
+        `- ${f.entry.version}: ${f.entry.title} _(breaking, names no API)_`
+      )
+    }
   }
-  for (const m of p.notes.matched) {
-    const names = [...new Set(m.hits.map((h) => h.name))]
-    lines.push(
-      `- ${m.entry.version}: ${m.entry.title}${m.direct ? "" : " _(possibly)_"}. ${capitalize(usedLabel(m.hits, (n) => `\`${n}\``))}`
-    )
-    const strong = m.hits
-      .filter((h) => h.strength === "strong")
-      .map((h) => h.name)
-    for (const s of sitesFor(p, strong.length > 0 ? strong : names).slice(
-      0,
-      m.direct ? 3 : 1
-    ))
-      lines.push(`  - \`${siteLabel(s)}\``)
-  }
-  for (const e of p.notes.unattributedBreaking)
-    lines.push(`- ${e.version}: ${e.title} _(breaking, names no API)_`)
   lines.push("")
   lines.push(`<sub>${p.reasons.map((r) => r.detail).join(" · ")}</sub>`)
   return lines

@@ -4,9 +4,11 @@ import type { Brief, PackageBrief } from "@dep-radius/core"
 import {
   ago,
   coverageLabel,
+  type Finding,
   groupBriefs,
   oneNetOnly,
   opaqueLabel,
+  orderFindings,
   sinceLabel,
   siteLabel,
   sitesFor,
@@ -145,68 +147,62 @@ function packageBlock(
   )
 
   const touchCap = opts.verbose ? Number.POSITIVE_INFINITY : 10
-  for (const t of p.surface.touched.slice(0, touchCap)) {
-    lines.push("")
-    const label = t.bucket === "removed" ? c("red", "removed") : t.bucket
-    lines.push(
-      `  ${label}  ${c("bold", t.change.path)}${t.strength === "weak" ? c("dim", "  (by member name)") : ""}`
-    )
-    if (t.change.before)
+  const noteCap = opts.verbose ? Number.POSITIVE_INFINITY : 8
+  let touches = 0
+  let notes = 0
+  let previous: Finding["kind"] | undefined
+  for (const f of orderFindings(p)) {
+    if (f.kind === "type") {
+      if (++touches > touchCap) continue
+      const t = f.touched
+      lines.push("")
+      const label = t.bucket === "removed" ? c("red", "removed") : t.bucket
       lines.push(
-        c("dim", `    before  ${t.change.before.join("  |  ").slice(0, 200)}`)
+        `  ${label}  ${c("bold", t.change.path)}${t.strength === "weak" ? c("dim", "  (by member name)") : ""}`
       )
-    if (t.change.after)
-      lines.push(
-        c("dim", `    after   ${t.change.after.join("  |  ").slice(0, 200)}`)
-      )
-    for (const s of t.sites.slice(0, siteCap)) lines.push(`    ${siteLabel(s)}`)
-    if (t.sites.length > siteCap)
-      lines.push(c("dim", `    ... ${t.sites.length - siteCap} more`))
-  }
-
-  if (p.surface.touched.length > touchCap)
-    lines.push(
-      "",
-      c(
-        "dim",
-        `  ... ${p.surface.touched.length - touchCap} more changes you touch (--verbose)`
-      )
-    )
-
-  const shownNotes = opts.verbose
-    ? p.notes.matched
-    : p.notes.matched.slice(0, 8)
-  if (shownNotes.length > 0) lines.push("")
-  for (const m of shownNotes) {
-    const names = [...new Set(m.hits.map((h) => h.name))]
-    const tag = m.direct ? "" : c("dim", "  possibly")
-    lines.push(`  ${c("cyan", m.entry.version)}  ${m.entry.title}${tag}`)
-    const strongNames = m.hits
-      .filter((h) => h.strength === "strong")
-      .map((h) => h.name)
-    const sites = sitesFor(p, strongNames.length > 0 ? strongNames : names)
-    lines.push(c("dim", `    ${usedLabel(m.hits)}`))
-    for (const s of sites.slice(0, m.direct ? Math.min(3, siteCap) : 1))
-      lines.push(`    ${siteLabel(s)}`)
-    if (sites.length > (m.direct ? Math.min(3, siteCap) : 1))
-      lines.push(
-        c(
-          "dim",
-          `    ... ${sites.length - (m.direct ? Math.min(3, siteCap) : 1)} more sites`
+      if (t.change.before)
+        lines.push(
+          c("dim", `    before  ${t.change.before.join("  |  ").slice(0, 200)}`)
         )
+      if (t.change.after)
+        lines.push(
+          c("dim", `    after   ${t.change.after.join("  |  ").slice(0, 200)}`)
+        )
+      for (const s of t.sites.slice(0, siteCap))
+        lines.push(`    ${siteLabel(s)}`)
+      if (t.sites.length > siteCap)
+        lines.push(c("dim", `    ... ${t.sites.length - siteCap} more`))
+    } else if (f.kind === "note") {
+      if (++notes > noteCap) continue
+      const m = f.match
+      if (previous !== "note") lines.push("")
+      const names = [...new Set(m.hits.map((h) => h.name))]
+      const tag = m.direct ? "" : c("dim", "  possibly")
+      lines.push(`  ${c("cyan", m.entry.version)}  ${m.entry.title}${tag}`)
+      const strongNames = m.hits
+        .filter((h) => h.strength === "strong")
+        .map((h) => h.name)
+      const sites = sitesFor(p, strongNames.length > 0 ? strongNames : names)
+      lines.push(c("dim", `    ${usedLabel(m.hits)}`))
+      const shown = m.direct ? Math.min(3, siteCap) : 1
+      for (const s of sites.slice(0, shown)) lines.push(`    ${siteLabel(s)}`)
+      if (sites.length > shown)
+        lines.push(c("dim", `    ... ${sites.length - shown} more sites`))
+    } else {
+      if (previous !== "note" && previous !== "breaking-no-api") lines.push("")
+      lines.push(
+        `  ${c("cyan", f.entry.version)}  ${f.entry.title}  ${c("dim", "breaking, names no API")}`
       )
+    }
+    previous = f.kind
   }
-  if (p.notes.matched.length > shownNotes.length)
+  if (touches > touchCap || notes > noteCap) lines.push("")
+  if (touches > touchCap)
     lines.push(
-      c(
-        "dim",
-        `  ... ${p.notes.matched.length - shownNotes.length} more notes (--verbose)`
-      )
+      c("dim", `  ... ${touches - touchCap} more changes you touch (--verbose)`)
     )
-  for (const e of p.notes.unattributedBreaking)
-    lines.push(
-      `  ${c("cyan", e.version)}  ${e.title}  ${c("dim", "breaking, names no API")}`
-    )
+  if (notes > noteCap)
+    lines.push(c("dim", `  ... ${notes - noteCap} more notes (--verbose)`))
 
   lines.push("")
   for (const r of p.reasons) lines.push(c("dim", `  why: ${r.detail}`))
