@@ -5,18 +5,20 @@ import { parseArgs, promisify } from "node:util"
 
 import { defaultCacheDir } from "@dep-radius/core"
 
+import { Npm } from "./npm.ts"
 import { check } from "./check.ts"
 import { defaultDataDir } from "./store.ts"
 import { BudgetError, GitHub } from "./github.ts"
-import { DEFAULT_QUERIES, mine } from "./mine.ts"
 import { evaluate, renderSummary } from "./evaluate.ts"
+import { DEPENDABOT_QUERIES, mine, RENOVATE_QUERIES } from "./mine.ts"
 
 const HELP = `corpus: real upgrade cases from GitHub, and radius measured on them
 
 usage
-  corpus mine [--limit 40] [--since 2026-06-01] [--until 2026-09-13] [--query <q>]... [--max-lines 300]
-  corpus evaluate [--limit 1000] [--concurrency 2] [--force]
+  corpus mine [--limit 40] [--since 2026-06-01] [--until 2026-09-13] [--query <q>]... [--dependabot]
+              [--max-lines 300] [--max-packages 1]
   corpus check [--limit 1000]
+  corpus evaluate [--limit 1000] [--concurrency 2] [--force] [--all]
 
 options
   --data <dir>    where cases, clones and reports go (default $XDG_CACHE_HOME/dep-radius-corpus,
@@ -60,6 +62,9 @@ async function main(argv: string[]): Promise<number> {
       until: { type: "string" },
       query: { type: "string", multiple: true },
       "max-lines": { type: "string", default: "300" },
+      "max-packages": { type: "string", default: "1" },
+      dependabot: { type: "boolean", default: false },
+      all: { type: "boolean", default: false },
       concurrency: { type: "string", default: "2" },
       force: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
@@ -78,11 +83,17 @@ async function main(argv: string[]): Promise<number> {
     const reviews = await check({
       data,
       limit: Number(values.limit ?? "1000"),
+      npm: new Npm(data),
       log,
     })
-    const weak = reviews.filter((r) => r.weak).length
+    const count: Record<string, number> = {}
+    for (const r of reviews) count[r.result] = (count[r.result] ?? 0) + 1
     process.stdout.write(
-      `${reviews.length} cases checked, ${weak} weak, ${reviews.length - weak} supported\nreview: ${resolve(data, "review.md")}\n`
+      `${reviews.length} cases checked: ${Object.entries(count)
+        .map(([k, n]) => `${n} ${k}`)
+        .join(
+          ", "
+        )}; ${reviews.filter((r) => r.testsOnly).length} fix tests only\nreview: ${resolve(data, "review.md")}\n`
     )
     return 0
   }
@@ -106,11 +117,18 @@ async function main(argv: string[]): Promise<number> {
     const s = await mine(gh, {
       data,
       limit: Number(values.limit ?? "40"),
-      queries: values.query?.length ? values.query : DEFAULT_QUERIES,
+      queries: values.query?.length
+        ? values.query
+        : [
+            ...RENOVATE_QUERIES,
+            ...(values.dependabot ? DEPENDABOT_QUERIES : []),
+          ],
       since: values.since ?? isoDay(now - 90 * 86_400_000),
       // yesterday at the latest: a day still going returns different results on the next run
       until: values.until ?? isoDay(now - 86_400_000),
       maxLines: Number(values["max-lines"]),
+      maxPackages: Number(values["max-packages"]),
+      npm: new Npm(data),
       now: new Date(now),
       log,
     })
@@ -137,6 +155,7 @@ async function main(argv: string[]): Promise<number> {
       limit: Number(values.limit ?? "1000"),
       concurrency: Number(values.concurrency),
       force: values.force,
+      all: values.all,
       radiusCache: defaultCacheDir(process.env),
       log,
     })

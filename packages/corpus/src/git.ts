@@ -77,6 +77,10 @@ export class Repo {
     ])
   }
 
+  remove(): void {
+    rmSync(this.dir, { recursive: true, force: true })
+  }
+
   async has(sha: string): Promise<boolean> {
     try {
       await git(this.dir, ["cat-file", "-e", `${sha}^{commit}`])

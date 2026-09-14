@@ -118,6 +118,30 @@ describe("scorePackage", () => {
     expect(s.foundBy).toEqual(["types"])
   })
 
+  it("counts the distinct lines radius reports and the notes that reach a changed line", () => {
+    const s = scorePackage(
+      kase,
+      zod,
+      brief([
+        pkgBrief({
+          pkg: "zod",
+          matched: [{ name: "uuid" }, { name: "email" }],
+          byName: {
+            uuid: [site("src/a.ts", 9), site("src/a.ts", 20)],
+            email: [site("src/a.ts", 30)],
+          },
+          touched: [site("src/a.ts", 9), site("src/a.ts", 3)],
+        }),
+      ])
+    )
+    expect(s).toMatchObject({
+      reportedLines: 4,
+      reportedHits: 2,
+      matchedNotes: 2,
+      matchedNotesHit: 1,
+    })
+  })
+
   it("counts only the lines of files importing the package", () => {
     const s = scorePackage(
       kase,
@@ -210,6 +234,41 @@ describe("totals", () => {
       notAnalysedPackages: 1,
       medianCannotTie: 2,
       medianMatchedNotes: 0,
+      reportedLines: 0,
+      reportedHits: 0,
+      matchedNotes: 3,
+      matchedNotesHit: 0,
+      analysedPackages: 4,
+      quietPackages: 3,
+    })
+  })
+
+  it("pools precision over every analysed package, with expected lines or not", () => {
+    const t = totals([
+      result("a", [
+        score({
+          reportedLines: 4,
+          reportedHits: 1,
+          matchedNotes: 2,
+          matchedNotesHit: 1,
+        }),
+        score({
+          expected: 0,
+          reportedLines: 6,
+          reportedHits: 0,
+          matchedNotes: 1,
+          matchedNotesHit: 0,
+        }),
+        score({ verdict: "not-analysed", reportedLines: 9 }),
+      ]),
+    ])
+    expect(t).toMatchObject({
+      reportedLines: 10,
+      reportedHits: 1,
+      matchedNotes: 3,
+      matchedNotesHit: 1,
+      analysedPackages: 2,
+      quietPackages: 0,
     })
   })
 

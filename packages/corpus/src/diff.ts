@@ -111,7 +111,7 @@ export function importsPackage(source: string, pkg: string): boolean {
 }
 
 // Blank lines and lines holding only punctuation or a comment carry no call to point at.
-function meaningful(text: string): boolean {
+export function meaningful(text: string): boolean {
   const t = text.trim()
   return (
     t.length > 0 && !/^(?:\/\/|\/\*|\*|<!--)/.test(t) && /[A-Za-z0-9_$]/.test(t)

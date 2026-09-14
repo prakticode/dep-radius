@@ -18,6 +18,12 @@ export interface PackageScore {
   // a link lands in a file the fix changed, on another line: a near miss worth reading
   sameFile: boolean
   matchedNotes: number
+  // matched notes that link to at least one expected line
+  matchedNotesHit?: number
+  // distinct lines radius points at for the package, through matched notes and touched type
+  // changes, and how many of them the fix changed
+  reportedLines?: number
+  reportedHits?: number
   // the notes radius cannot tie to any name: the list a reader goes through
   cannotTie: number
   notesCoverage?: string
@@ -33,6 +39,10 @@ export interface CaseResult {
   error?: string
 }
 
+type Line = { file: string; line: number }
+
+const keyOf = (s: Line) => `${s.file}:${s.line}`
+
 // The same rule as the benchmark harness, without its knowledge of which note is the change: any
 // matched note counts, since a mined case does not know which note the fix answers.
 export function scorePackage(
@@ -40,16 +50,9 @@ export function scorePackage(
   upgrade: CaseManifest["packages"][number],
   brief: Brief
 ): PackageScore {
-  const expected = new Set(
-    c.expected
-      .filter((e) => e.imports.includes(upgrade.name))
-      .map((e) => `${e.file}:${e.line}`)
-  )
-  const files = new Set(
-    c.expected
-      .filter((e) => e.imports.includes(upgrade.name))
-      .map((e) => e.file)
-  )
+  const mine = c.expected.filter((e) => e.imports.includes(upgrade.name))
+  const expected = new Set(mine.map(keyOf))
+  const files = new Set(mine.map((e) => e.file))
   const base = {
     name: upgrade.name,
     from: upgrade.from,
@@ -70,15 +73,15 @@ export function scorePackage(
       cannotTie: 0,
     }
   }
-  const noteSites = pkg.notes.matched.flatMap((m) =>
+  const sitesOf = (m: (typeof pkg.notes.matched)[number]) =>
     m.hits.flatMap((h) => pkg.usage.byName[h.name] ?? [])
-  )
+  const noteSites = pkg.notes.matched.flatMap(sitesOf)
   const typeSites = pkg.surface.touched.flatMap((t) => t.sites)
-  const hit = (sites: { file: string; line: number }[]) =>
-    sites.some((s) => expected.has(`${s.file}:${s.line}`))
+  const hit = (sites: Line[]) => sites.some((s) => expected.has(keyOf(s)))
   const foundBy: PackageScore["foundBy"] = []
   if (hit(noteSites)) foundBy.push("notes")
   if (hit(typeSites)) foundBy.push("types")
+  const reported = new Set([...noteSites, ...typeSites].map(keyOf))
   return {
     ...base,
     verdict: pkg.verdict,
@@ -86,6 +89,9 @@ export function scorePackage(
     foundBy,
     sameFile: [...noteSites, ...typeSites].some((s) => files.has(s.file)),
     matchedNotes: pkg.notes.matched.length,
+    matchedNotesHit: pkg.notes.matched.filter((m) => hit(sitesOf(m))).length,
+    reportedLines: reported.size,
+    reportedHits: [...reported].filter((k) => expected.has(k)).length,
     cannotTie: pkg.notes.unattributedChanges.length,
     notesCoverage: pkg.notes.coverage,
     surface: pkg.surface.status,
@@ -122,6 +128,15 @@ export interface Totals {
   // over analysed packages with expected lines
   medianCannotTie: number
   medianMatchedNotes: number
+  // over every analysed package of the cases, with expected lines or not: the lines radius points
+  // at and those the fix changed, the matched notes and those linking to a changed line
+  reportedLines: number
+  reportedHits: number
+  matchedNotes: number
+  matchedNotesHit: number
+  // every analysed package, and those radius calls quiet
+  analysedPackages: number
+  quietPackages: number
 }
 
 export function totals(results: CaseResult[]): Totals {
@@ -130,6 +145,11 @@ export function totals(results: CaseResult[]): Totals {
   const scored = ok.filter((r) => scoredOf(r).length > 0)
   const pkgs = ok.flatMap(scoredOf)
   const analysed = pkgs.filter((p) => p.verdict !== "not-analysed")
+  const every = ok
+    .flatMap((r) => r.packages)
+    .filter((p) => p.verdict !== "not-analysed")
+  const sum = (f: (p: PackageScore) => number | undefined) =>
+    every.reduce((n, p) => n + (f(p) ?? 0), 0)
   return {
     cases: results.length,
     errors: results.length - ok.length,
@@ -144,5 +164,11 @@ export function totals(results: CaseResult[]): Totals {
     notAnalysedPackages: pkgs.length - analysed.length,
     medianCannotTie: median(analysed.map((p) => p.cannotTie)),
     medianMatchedNotes: median(analysed.map((p) => p.matchedNotes)),
+    reportedLines: sum((p) => p.reportedLines),
+    reportedHits: sum((p) => p.reportedHits),
+    matchedNotes: sum((p) => p.matchedNotes),
+    matchedNotesHit: sum((p) => p.matchedNotesHit),
+    analysedPackages: every.length,
+    quietPackages: every.filter((p) => p.verdict === "quiet").length,
   }
 }

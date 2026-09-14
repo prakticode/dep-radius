@@ -1,22 +1,85 @@
 import { join } from "node:path"
 
 import { Repo } from "./git.ts"
+import { releaseGroups } from "./groups.ts"
 import { upgradesBetween } from "./upgrades.ts"
 import { readJson, writeJson } from "./store.ts"
+import { type Npm, repositoryKey } from "./npm.ts"
 import { BudgetError, type GitHub } from "./github.ts"
-import { expectedLines, parseDiff, SOURCE_FILE } from "./diff.ts"
 import { isHumanFix, type PrCommit, splitCommits } from "./commits.ts"
-import { caseId, type CaseManifest, saveCase, type Upgrade } from "./case.ts"
+import { REFORMAT_SHARE, reformattedLines, share } from "./reformat.ts"
+import { bumpOf, isTestFile, type SplitName, splitOf } from "./labels.ts"
+import {
+  expectedLines,
+  type FileDiff,
+  meaningful,
+  parseDiff,
+  SOURCE_FILE,
+} from "./diff.ts"
+import {
+  caseId,
+  type CaseLabels,
+  type CaseManifest,
+  type ExpectedLine,
+  saveCase,
+  type Upgrade,
+} from "./case.ts"
 
-// Renovate names the update kind in its titles and bodies, and a major is the update most likely
-// to need a fix: the richest source per search request. Dependabot never does, so it is searched
-// whole. `--query` replaces the list.
-export const DEFAULT_QUERIES = [
-  'is:pr is:merged is:public author:app/renovate language:TypeScript "(major)"',
-  'is:pr is:merged is:public author:app/renovate language:JavaScript "(major)"',
+// Renovate names what it updates in the title: "Update dependency zod to v4" for one package,
+// "Update sentry-javascript monorepo to v10" for one monorepo release. Those two shapes give cases
+// whose expected lines belong to one release. Dependabot is off by default: in a first run, none
+// of about a hundred of its merged pull requests carried a commit by a person. `--query` replaces
+// the list.
+export const RENOVATE_QUERIES = [
+  'is:pr is:merged is:public author:app/renovate language:TypeScript "update dependency"',
+  'is:pr is:merged is:public author:app/renovate language:JavaScript "update dependency"',
+  "is:pr is:merged is:public author:app/renovate language:TypeScript monorepo",
+  "is:pr is:merged is:public author:app/renovate language:JavaScript monorepo",
+]
+
+export const DEPENDABOT_QUERIES = [
   "is:pr is:merged is:public author:app/dependabot language:TypeScript",
   "is:pr is:merged is:public author:app/dependabot language:JavaScript",
 ]
+
+// GitHub search ignores punctuation and negated phrases: `"(major)"` matches "non-major", and
+// `-"non-major"` removes nothing. The title decides instead, before any clone.
+const GROUPED_TITLE =
+  /\bnon[- ]?major\b|\ball\b.*\b(?:dependencies|updates)\b|\block ?file maintenance\b/i
+
+export function groupedTitle(title: string): boolean {
+  return GROUPED_TITLE.test(title)
+}
+
+// GitHub serves 1000 results per search. A merge window holding more is searched as two halves,
+// down to an hour.
+export const SEARCH_CAP = 1000
+const MIN_WINDOW_MS = 3_600_000
+
+export interface Window {
+  from: number
+  to: number
+}
+
+export function windowQuery(w: Window): string {
+  const iso = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z")
+  return `merged:${iso(w.from)}..${iso(w.to)}`
+}
+
+export function dayWindow(day: string): Window {
+  const from = Date.parse(`${day}T00:00:00Z`)
+  return { from, to: from + 86_400_000 - 1000 }
+}
+
+// The newer half first, like the days.
+export function halves(w: Window): Window[] | undefined {
+  if (w.to - w.from < 2 * MIN_WINDOW_MS) return undefined
+  const mid = w.from + Math.floor((w.to - w.from + 1000) / 2000) * 1000
+  return [
+    { from: mid, to: w.to },
+    { from: w.from, to: mid - 1000 },
+  ]
+}
 
 const SEARCH = `query($q: String!, $cursor: String) {
   search(query: $q, type: ISSUE, first: 50, after: $cursor) {
@@ -88,7 +151,10 @@ interface SearchPage {
 }
 
 export interface MineState {
-  searches: Record<string, { cursor: string | null; done: boolean }>
+  searches: Record<
+    string,
+    { cursor: string | null; done: boolean; split?: boolean }
+  >
   prs: Record<
     string,
     { status: "kept" | "rejected"; reason?: string; at: string }
@@ -99,11 +165,15 @@ export interface MineOptions {
   data: string
   limit: number
   queries: string[]
-  // merge dates searched, newest first, one day per search so no day passes GitHub's 1000 results
+  // merge dates searched, newest first
   since: string
   until: string
   maxLines: number
+  // how many releases one case may upgrade: a release is one package, or the packages of one
+  // monorepo published together
+  maxPackages: number
   now: Date
+  npm: Npm
   log: (line: string) => void
 }
 
@@ -137,6 +207,8 @@ export interface MineSummary {
   requests: number
 }
 
+class LimitReached extends Error {}
+
 export async function mine(gh: GitHub, o: MineOptions): Promise<MineSummary> {
   const statePath = join(o.data, "state", "mine.json")
   const state = readJson<MineState>(statePath) ?? { searches: {}, prs: {} }
@@ -148,75 +220,137 @@ export async function mine(gh: GitHub, o: MineOptions): Promise<MineSummary> {
     rejected: {},
     requests: 0,
   }
-  const reject = (id: string, reason: string) => {
+  const keptRepos = new Set(
+    Object.entries(state.prs)
+      .filter(([, v]) => v.status === "kept")
+      .map(([id]) => id.replace(/__\d+$/, ""))
+  )
+  const reject = (id: string, repo: string, reason: string) => {
     state.prs[id] = { status: "rejected", reason, at: o.now.toISOString() }
     summary.rejected[reason] = (summary.rejected[reason] ?? 0) + 1
     o.log(`  rejected: ${reason}`)
     save()
+    // a clone only serves kept cases: without one, it is disk spent for nothing
+    if (!keptRepos.has(repo.replace("/", "__"))) new Repo(o.data, repo).remove()
+  }
+
+  const consider = async (pr: ApiPr) => {
+    if (pr.number === undefined || pr.repository.isPrivate) return
+    if (!pr.mergedAt) return
+    summary.scanned++
+    if (groupedTitle(pr.title)) return
+    let commits = toCommits(pr.commits)
+    if (!commits.some(isHumanFix) && pr.commits.totalCount <= 10) return
+    const repo = pr.repository.nameWithOwner
+    const id = caseId(repo, pr.number)
+    if (state.prs[id]) return
+    if (pr.commits.totalCount > 10) {
+      if (pr.commits.totalCount > 100) return
+      const [owner, name] = repo.split("/")
+      const full = await gh.graphql<{
+        repository: { pullRequest: { commits: ApiCommits } }
+      }>(COMMITS, { owner, name, number: pr.number })
+      commits = toCommits(full.repository.pullRequest.commits)
+      if (!commits.some(isHumanFix)) return
+    }
+    summary.candidates++
+    o.log(
+      `[${summary.candidates}/${o.limit}] ${pr.url} ${pr.title.slice(0, 70)}`
+    )
+    const outcome = await mineCandidate(o, pr, commits)
+    if (typeof outcome === "string") reject(id, repo, outcome)
+    else {
+      saveCase(o.data, outcome)
+      state.prs[id] = { status: "kept", at: o.now.toISOString() }
+      keptRepos.add(repo.replace("/", "__"))
+      summary.kept++
+      o.log(
+        `  kept: ${outcome.packages.length} upgrades, ${outcome.expected.length} expected lines`
+      )
+      save()
+    }
+    if (summary.candidates >= o.limit) throw new LimitReached()
+  }
+
+  const search = async (query: string, w: Window): Promise<void> => {
+    const q = `${query} ${windowQuery(w)}`
+    const progress = (state.searches[q] ??= { cursor: null, done: false })
+    if (progress.split) {
+      for (const h of halves(w)!) await search(query, h)
+      return
+    }
+    while (!progress.done) {
+      const page = await gh.graphql<SearchPage>(
+        SEARCH,
+        { q, cursor: progress.cursor },
+        { search: true }
+      )
+      if (page.search.issueCount > SEARCH_CAP && progress.cursor === null) {
+        const parts = halves(w)
+        if (parts) {
+          progress.split = true
+          save()
+          for (const h of parts) await search(query, h)
+          return
+        }
+        o.log(
+          `${q}: ${page.search.issueCount} results, GitHub serves the first ${SEARCH_CAP} only`
+        )
+      }
+      for (const pr of page.search.nodes) await consider(pr)
+      progress.cursor = page.search.pageInfo.endCursor
+      progress.done = !page.search.pageInfo.hasNextPage
+      save()
+    }
   }
 
   try {
-    outer: for (const query of o.queries) {
-      for (const day of days(o.since, o.until)) {
-        const q = `${query} merged:${day}`
-        const progress = (state.searches[q] ??= { cursor: null, done: false })
-        while (!progress.done) {
-          const page = await gh.graphql<SearchPage>(
-            SEARCH,
-            { q, cursor: progress.cursor },
-            { search: true }
-          )
-          if (page.search.issueCount > 1000 && progress.cursor === null)
-            o.log(
-              `${q}: ${page.search.issueCount} results, GitHub serves the first 1000 only`
-            )
-          for (const pr of page.search.nodes) {
-            if (pr.number === undefined || pr.repository.isPrivate) continue
-            if (!pr.mergedAt) continue
-            summary.scanned++
-            let commits = toCommits(pr.commits)
-            if (!commits.some(isHumanFix) && pr.commits.totalCount <= 10)
-              continue
-            const id = caseId(pr.repository.nameWithOwner, pr.number)
-            if (state.prs[id]) continue
-            if (pr.commits.totalCount > 10) {
-              if (pr.commits.totalCount > 100) continue
-              const [owner, name] = pr.repository.nameWithOwner.split("/")
-              const full = await gh.graphql<{
-                repository: { pullRequest: { commits: ApiCommits } }
-              }>(COMMITS, { owner, name, number: pr.number })
-              commits = toCommits(full.repository.pullRequest.commits)
-              if (!commits.some(isHumanFix)) continue
-            }
-            summary.candidates++
-            o.log(
-              `[${summary.candidates}/${o.limit}] ${pr.url} ${pr.title.slice(0, 70)}`
-            )
-            const outcome = await mineCandidate(o, pr, commits)
-            if (typeof outcome === "string") reject(id, outcome)
-            else {
-              saveCase(o.data, outcome)
-              state.prs[id] = { status: "kept", at: o.now.toISOString() }
-              summary.kept++
-              o.log(
-                `  kept: ${outcome.packages.length} upgrades, ${outcome.expected.length} expected lines`
-              )
-              save()
-            }
-            if (summary.candidates >= o.limit) break outer
-          }
-          progress.cursor = page.search.pageInfo.endCursor
-          progress.done = !page.search.pageInfo.hasNextPage
-          save()
-        }
-      }
-    }
+    for (const day of days(o.since, o.until))
+      for (const query of o.queries) await search(query, dayWindow(day))
   } catch (e) {
-    if (!(e instanceof BudgetError)) throw e
-    summary.stopped = e.message
+    if (e instanceof BudgetError) summary.stopped = e.message
+    else if (!(e instanceof LimitReached)) throw e
   }
   summary.requests = gh.requests
   return summary
+}
+
+function round(x: number): number {
+  return Math.round(x * 100) / 100
+}
+
+// Labels a case carries from the moment it is mined, from the upgrade and the fix alone.
+export function mineLabels(
+  repo: string,
+  pr: number,
+  packages: Upgrade[],
+  files: FileDiff[],
+  expected: ExpectedLine[]
+): { split: SplitName; labels: CaseLabels } {
+  const layout = reformattedLines(files)
+  const removed = files.flatMap((f) =>
+    f.oldPath
+      ? f.removed
+          .filter((l) => meaningful(l.text))
+          .map((l) => `${f.oldPath}:${l.line}`)
+      : []
+  )
+  return {
+    split: splitOf(repo, pr),
+    labels: {
+      bump: bumpOf(packages),
+      testsOnly: expected.every((e) => isTestFile(e.file)),
+      reformatShare: round(
+        share(removed.filter((k) => layout.has(k)).length, removed.length)
+      ),
+      expectedReformatShare: round(
+        share(
+          expected.filter((e) => layout.has(`${e.file}:${e.line}`)).length,
+          expected.length
+        )
+      ),
+    },
+  }
 }
 
 async function mineCandidate(
@@ -240,6 +374,19 @@ async function mineCandidate(
     return "could not read the lockfiles"
   }
   if (packages.length === 0) return "no dependency upgraded"
+  if (packages.length > 1) {
+    const repositories = new Map<string, string | undefined>()
+    for (const p of packages) {
+      try {
+        const m = await o.npm.manifest(p.name, p.to)
+        repositories.set(p.name, repositoryKey(m?.repository))
+      } catch {
+        repositories.set(p.name, undefined)
+      }
+    }
+    if (releaseGroups(packages, repositories).length > o.maxPackages)
+      return "several releases upgraded"
+  }
 
   const paths = (await repo.changedPaths(split.upgraded, split.fixEnd)).filter(
     (p) => SOURCE_FILE.test(p) && !p.split("/").includes("node_modules")
@@ -262,10 +409,19 @@ async function mineCandidate(
   if (found.empty) return found.empty
   // a fix rewriting hundreds of lines is a refactor or a reformat riding along, not an adaptation
   if (found.expected.length > o.maxLines) return "fix too large"
+  const repoName = pr.repository.nameWithOwner
+  const { split: set, labels } = mineLabels(
+    repoName,
+    pr.number!,
+    packages,
+    files,
+    found.expected
+  )
+  if (labels.reformatShare >= REFORMAT_SHARE) return "fix is mostly a reformat"
   return {
-    id: caseId(pr.repository.nameWithOwner, pr.number!),
+    id: caseId(repoName, pr.number!),
     source: "bot-pr-human-fix",
-    repo: pr.repository.nameWithOwner,
+    repo: repoName,
     pr: pr.number!,
     url: pr.url,
     title: pr.title,
@@ -283,5 +439,7 @@ async function mineCandidate(
     expected: found.expected,
     added: found.added,
     minedAt: o.now.toISOString(),
+    split: set,
+    labels,
   }
 }

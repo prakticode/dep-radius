@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { judge } from "../src/check.ts"
+import { judge, resultOf } from "../src/check.ts"
 import type { CaseManifest } from "../src/case.ts"
 
 const base: Pick<CaseManifest, "expected" | "added" | "packages"> = {
@@ -26,7 +26,15 @@ describe("judge", () => {
     })
     expect(out).toEqual({
       weak: false,
-      evidence: [{ package: "zod", onSite: ["src/a.ts:4"], names: [] }],
+      evidence: [
+        {
+          package: "zod",
+          onSite: ["src/a.ts:4"],
+          options: [],
+          types: [],
+          names: [],
+        },
+      ],
     })
   })
 
@@ -41,7 +49,7 @@ describe("judge", () => {
       { zod: { names: ["coerce", "object"], sites: [] } }
     )
     expect(out.evidence).toEqual([
-      { package: "zod", onSite: [], names: ["coerce"] },
+      { package: "zod", onSite: [], options: [], types: [], names: ["coerce"] },
     ])
   })
 
@@ -62,5 +70,37 @@ describe("judge", () => {
       react: { names: ["items"], sites: [{ file: "src/a.ts", line: 4 }] },
     })
     expect(out.weak).toBe(true)
+  })
+
+  it("supports a case whose expected line is an option key or an imported type", () => {
+    const out = judge(base, {
+      zod: {
+        names: [],
+        sites: [],
+        options: ["src/a.ts:4"],
+        types: ["src/a.ts:4", "src/a.ts:8"],
+      },
+    })
+    expect(out.evidence).toEqual([
+      {
+        package: "zod",
+        onSite: [],
+        options: ["src/a.ts:4"],
+        types: ["src/a.ts:4"],
+        names: [],
+      },
+    ])
+  })
+})
+
+describe("resultOf", () => {
+  it("calls a case a reformat when most expected lines only changed layout, whatever else", () => {
+    expect(resultOf({ weak: false }, { expectedReformatShare: 0.8 })).toBe(
+      "reformat"
+    )
+    expect(resultOf({ weak: false }, { expectedReformatShare: 0.2 })).toBe(
+      "supported"
+    )
+    expect(resultOf({ weak: true }, { expectedReformatShare: 0 })).toBe("weak")
   })
 })
