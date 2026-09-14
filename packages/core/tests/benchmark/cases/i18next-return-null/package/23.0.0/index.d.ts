@@ -1,20 +1,15 @@
 // Internal Helpers
-type $MergeBy<T, K> = Omit<T, keyof K> & K
-type $Dictionary<T = any> = { [key: string]: T }
-type $Value<Obj, Key> = Key extends keyof Obj ? Obj[Key] : never
-type $OmitArrayKeys<Arr> = Arr extends readonly any[]
-  ? Omit<Arr, keyof any[]>
-  : Arr
-type $PreservedValue<Value, Fallback> = [Value] extends [never]
-  ? Fallback
-  : Value
-type $FirstNamespace<Ns extends Namespace> = Ns extends readonly any[]
-  ? Ns[0]
-  : Ns
-type $IsResourcesDefined = [keyof _Resources] extends [never] ? false : true
-type $ValueIfResourcesDefined<Value, Fallback> =
-  $IsResourcesDefined extends true ? Value : Fallback
-type $SpecialObject = object | Array<string | object>
+type $MergeBy<T, K> = Omit<T, keyof K> & K;
+type $Dictionary<T = any> = { [key: string]: T };
+type $Value<Obj, Key> = Key extends keyof Obj ? Obj[Key] : never;
+type $OmitArrayKeys<Arr> = Arr extends readonly any[] ? Omit<Arr, keyof any[]> : Arr;
+type $PreservedValue<Value, Fallback> = [Value] extends [never] ? Fallback : Value;
+type $FirstNamespace<Ns extends Namespace> = Ns extends readonly any[] ? Ns[0] : Ns;
+type $IsResourcesDefined = [keyof _Resources] extends [never] ? false : true;
+type $ValueIfResourcesDefined<Value, Fallback> = $IsResourcesDefined extends true
+  ? Value
+  : Fallback;
+type $SpecialObject = object | Array<string | object>;
 
 /**
  * This interface can be augmented by users to add types to `i18next` default TypeOptions.
@@ -53,62 +48,62 @@ export type TypeOptions = $MergeBy<
     /**
      * Allows null values as valid translation
      */
-    returnNull: false
+    returnNull: false;
 
     /**
      * Allows objects as valid translation result
      */
-    returnObjects: false
+    returnObjects: false;
 
     /**
      * Char to separate keys
      */
-    keySeparator: "."
+    keySeparator: '.';
 
     /**
      * Char to split namespace from key
      */
-    nsSeparator: ":"
+    nsSeparator: ':';
 
     /**
      * Char to split namespace from key
      */
-    pluralSeparator: "_"
+    pluralSeparator: '_';
 
     /**
      * Default namespace used if not passed to translation function
      */
-    defaultNS: "translation"
+    defaultNS: 'translation';
 
     /**
      * Json Format Version - V4 allows plural suffixes
      */
-    jsonFormat: "v4"
+    jsonFormat: 'v4';
 
     /**
      * Resources to initialize with
      */
-    resources: object
+    resources: object;
 
     /**
      * Flag that allows HTML elements to receive objects. This is only useful for React applications
      * where you pass objects to HTML elements so they can be replaced to their respective interpolation
      * values (mostly with Trans component)
      */
-    allowObjectInHTMLChildren: false
+    allowObjectInHTMLChildren: false;
 
     /**
      * Prefix for interpolation
      */
-    interpolationPrefix: "{{"
+    interpolationPrefix: '{{';
 
     /**
      * Suffix for interpolation
      */
-    interpolationSuffix: "}}"
+    interpolationSuffix: '}}';
   },
   CustomTypeOptions
->
+>;
 
 export type PluginOptions<T> = $MergeBy<
   {
@@ -116,183 +111,183 @@ export type PluginOptions<T> = $MergeBy<
      * Options for language detection - check documentation of plugin
      * @default undefined
      */
-    detection?: object
+    detection?: object;
 
     /**
      * Options for backend - check documentation of plugin
      * @default undefined
      */
-    backend?: T
+    backend?: T;
 
     /**
      * Options for cache layer - check documentation of plugin
      * @default undefined
      */
-    cache?: object
+    cache?: object;
 
     /**
      * Options for i18n message format - check documentation of plugin
      * @default undefined
      */
-    i18nFormat?: object
+    i18nFormat?: object;
   },
   CustomPluginOptions
->
+>;
 
 export type FormatFunction = (
   value: any,
   format?: string,
   lng?: string,
-  options?: InterpolationOptions & $Dictionary
-) => string
+  options?: InterpolationOptions & $Dictionary,
+) => string;
 
 export interface InterpolationOptions {
   /**
    * Format function see formatting for details
    * @default noop
    */
-  format?: FormatFunction
+  format?: FormatFunction;
   /**
    * Used to separate format from interpolation value
    * @default ','
    */
-  formatSeparator?: string
+  formatSeparator?: string;
   /**
    * Escape function
    * @default str => str
    */
-  escape?(str: string): string
+  escape?(str: string): string;
 
   /**
    * Always format interpolated values.
    * @default false
    */
-  alwaysFormat?: boolean
+  alwaysFormat?: boolean;
   /**
    * Escape passed in values to avoid xss injection
    * @default true
    */
-  escapeValue?: boolean
+  escapeValue?: boolean;
   /**
    * If true, then value passed into escape function is not casted to string, use with custom escape function that does its own type check
    * @default false
    */
-  useRawValueToEscape?: boolean
+  useRawValueToEscape?: boolean;
   /**
    * Prefix for interpolation
    * @default '{{'
    */
-  prefix?: string
+  prefix?: string;
   /**
    * Suffix for interpolation
    * @default '}}'
    */
-  suffix?: string
+  suffix?: string;
   /**
    * Escaped prefix for interpolation (regexSafe)
    * @default undefined
    */
-  prefixEscaped?: string
+  prefixEscaped?: string;
   /**
    * Escaped suffix for interpolation (regexSafe)
    * @default undefined
    */
-  suffixEscaped?: string
+  suffixEscaped?: string;
   /**
    * Suffix to unescaped mode
    * @default undefined
    */
-  unescapeSuffix?: string
+  unescapeSuffix?: string;
   /**
    * Prefix to unescaped mode
    * @default '-'
    */
-  unescapePrefix?: string
+  unescapePrefix?: string;
   /**
    * Prefix for nesting
    * @default '$t('
    */
-  nestingPrefix?: string
+  nestingPrefix?: string;
   /**
    * Suffix for nesting
    * @default ')'
    */
-  nestingSuffix?: string
+  nestingSuffix?: string;
   /**
    * Escaped prefix for nesting (regexSafe)
    * @default undefined
    */
-  nestingPrefixEscaped?: string
+  nestingPrefixEscaped?: string;
   /**
    * Escaped suffix for nesting (regexSafe)
    * @default undefined
    */
-  nestingSuffixEscaped?: string
+  nestingSuffixEscaped?: string;
   /**
    * Separates options from key
    * @default ','
    */
-  nestingOptionsSeparator?: string
+  nestingOptionsSeparator?: string;
   /**
    * Global variables to use in interpolation replacements
    * @default undefined
    */
 
-  defaultVariables?: { [index: string]: any }
+  defaultVariables?: { [index: string]: any };
   /**
    * After how many interpolation runs to break out before throwing a stack overflow
    * @default 1000
    */
-  maxReplaces?: number
+  maxReplaces?: number;
 
   /**
    * If true, it will skip to interpolate the variables
    * @default true
    */
-  skipOnVariables?: boolean
+  skipOnVariables?: boolean;
 }
 
 export interface FallbackLngObjList {
-  [language: string]: readonly string[]
+  [language: string]: readonly string[];
 }
 
 export type FallbackLng =
   | string
   | readonly string[]
   | FallbackLngObjList
-  | ((code: string) => string | readonly string[] | FallbackLngObjList)
+  | ((code: string) => string | readonly string[] | FallbackLngObjList);
 
 export interface ReactOptions {
   /**
    * Set it to fallback to let passed namespaces to translated hoc act as fallbacks
    * @default 'default'
    */
-  nsMode?: "default" | "fallback"
+  nsMode?: 'default' | 'fallback';
   /**
    * Set it to the default parent element created by the Trans component.
    * @default 'div'
    */
-  defaultTransParent?: string
+  defaultTransParent?: string;
   /**
    * Set which events trigger a re-render, can be set to false or string of events
    * @default 'languageChanged'
    */
-  bindI18n?: string | false
+  bindI18n?: string | false;
   /**
    * Set which events on store trigger a re-render, can be set to false or string of events
    * @default ''
    */
-  bindI18nStore?: string | false
+  bindI18nStore?: string | false;
   /**
    * Set fallback value for Trans components without children
    * @default undefined
    */
-  transEmptyNodeValue?: string
+  transEmptyNodeValue?: string;
   /**
    * Set it to false if you do not want to use Suspense
    * @default true
    */
-  useSuspense?: boolean
+  useSuspense?: boolean;
   /**
    * Function to generate an i18nKey from the defaultValue (or Trans children)
    * when no key is provided.
@@ -301,34 +296,32 @@ export interface ReactOptions {
    * that always throws an error.
    * @default undefined
    */
-  hashTransKey?(
-    defaultValue: TOptionsBase["defaultValue"]
-  ): TOptionsBase["defaultValue"]
+  hashTransKey?(defaultValue: TOptionsBase['defaultValue']): TOptionsBase['defaultValue'];
   /**
    * Convert eg. <br/> found in translations to a react component of type br
    * @default true
    */
-  transSupportBasicHtmlNodes?: boolean
+  transSupportBasicHtmlNodes?: boolean;
   /**
    * Which nodes not to convert in defaultValue generation in the Trans component.
    * @default ['br', 'strong', 'i', 'p']
    */
-  transKeepBasicHtmlNodesFor?: readonly string[]
+  transKeepBasicHtmlNodesFor?: readonly string[];
   /**
    * Wrap text nodes in a user-specified element.
    * @default ''
    */
-  transWrapTextNodes?: string
+  transWrapTextNodes?: string;
   /**
    * Optional keyPrefix that will be automatically applied to returned t function in useTranslation for example.
    * @default undefined
    */
-  keyPrefix?: string
+  keyPrefix?: string;
   /**
    * Unescape function
    * by default it unescapes some basic html entities
    */
-  unescape?(str: string): string
+  unescape?(str: string): string;
 }
 
 export interface InitOptions<T = object> extends PluginOptions<T> {
@@ -336,43 +329,43 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * Logs info level to console output. Helps finding issues with loading not working.
    * @default false
    */
-  debug?: boolean
+  debug?: boolean;
 
   /**
    * Resources to initialize with (if not using loading or not appending using addResourceBundle)
    * @default undefined
    */
-  resources?: Resource
+  resources?: Resource;
 
   /**
    * Allow initializing with bundled resources while using a backend to load non bundled ones.
    * @default false
    */
-  partialBundledLanguages?: boolean
+  partialBundledLanguages?: boolean;
 
   /**
    * Language to use (overrides language detection)
    * @default undefined
    */
-  lng?: string
+  lng?: string;
 
   /**
    * Language to use if translations in user language are not available.
    * @default 'dev'
    */
-  fallbackLng?: false | FallbackLng
+  fallbackLng?: false | FallbackLng;
 
   /**
    * Array of allowed languages
    * @default false
    */
-  supportedLngs?: false | readonly string[]
+  supportedLngs?: false | readonly string[];
 
   /**
    * If true will pass eg. en-US if finding en in supportedLngs
    * @default false
    */
-  nonExplicitSupportedLngs?: boolean
+  nonExplicitSupportedLngs?: boolean;
 
   /**
    * Language codes to lookup, given set language is
@@ -381,55 +374,55 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * 'languageOnly' --> 'en'
    * @default 'all'
    */
-  load?: "all" | "currentOnly" | "languageOnly"
+  load?: 'all' | 'currentOnly' | 'languageOnly';
 
   /**
    * Array of languages to preload. Important on server-side to assert translations are loaded before rendering views.
    * @default false
    */
-  preload?: false | readonly string[]
+  preload?: false | readonly string[];
 
   /**
    * Language will be lowercased eg. en-US --> en-us
    * @default false
    */
-  lowerCaseLng?: boolean
+  lowerCaseLng?: boolean;
 
   /**
    * Language will be lowercased EN --> en while leaving full locales like en-US
    * @default false
    */
-  cleanCode?: boolean
+  cleanCode?: boolean;
 
   /**
    * String or array of namespaces to load
    * @default 'translation'
    */
-  ns?: string | readonly string[]
+  ns?: string | readonly string[];
 
   /**
    * Default namespace used if not passed to translation function
    * @default 'translation'
    */
-  defaultNS?: string | false | readonly string[]
+  defaultNS?: string | false | readonly string[];
 
   /**
    * String or array of namespaces to lookup key if not found in given namespace.
    * @default false
    */
-  fallbackNS?: false | string | readonly string[]
+  fallbackNS?: false | string | readonly string[];
 
   /**
    * Calls save missing key function on backend if key not found.
    * @default false
    */
-  saveMissing?: boolean
+  saveMissing?: boolean;
 
   /**
    * Calls save missing key function on backend if key not found also for plural forms.
    * @default false
    */
-  saveMissingPlurals?: boolean
+  saveMissingPlurals?: boolean;
 
   /**
    * Experimental: enable to update default values using the saveMissing
@@ -438,19 +431,19 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * Only supported if backend supports it already)
    * @default false
    */
-  updateMissing?: boolean
+  updateMissing?: boolean;
 
   /**
    * @default 'fallback'
    */
-  saveMissingTo?: "current" | "all" | "fallback"
+  saveMissingTo?: 'current' | 'all' | 'fallback';
 
   /**
    * Used to not fallback to the key as default value, when using saveMissing functionality.
    * i.e. when using with i18next-http-backend this will result in having a key with an empty string value.
    * @default false
    */
-  missingKeyNoValueFallbackToKey?: boolean
+  missingKeyNoValueFallbackToKey?: boolean;
 
   /**
    * Used for custom missing key handling (needs saveMissing set to true!)
@@ -464,100 +457,96 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
         key: string,
         fallbackValue: string,
         updateMissing: boolean,
-        options: any
-      ) => void)
+        options: any,
+      ) => void);
 
   /**
    * Receives a key that was not found in `t()` and returns a value, that will be returned by `t()`
    * @default noop
    */
-  parseMissingKeyHandler?(key: string, defaultValue?: string): any
+  parseMissingKeyHandler?(key: string, defaultValue?: string): any;
 
   /**
    * Appends namespace to missing key
    * @default false
    */
-  appendNamespaceToMissingKey?: boolean
+  appendNamespaceToMissingKey?: boolean;
 
   /**
    * Gets called in case a interpolation value is undefined. This method will not be called if the value is empty string or null
    * @default noop
    */
-  missingInterpolationHandler?: (
-    text: string,
-    value: any,
-    options: InitOptions
-  ) => any
+  missingInterpolationHandler?: (text: string, value: any, options: InitOptions) => any;
 
   /**
    * Will use 'plural' as suffix for languages only having 1 plural form, setting it to false will suffix all with numbers
    * @default true
    */
-  simplifyPluralSuffix?: boolean
+  simplifyPluralSuffix?: boolean;
 
   /**
    * String or array of postProcessors to apply per default
    * @default false
    */
-  postProcess?: false | string | readonly string[]
+  postProcess?: false | string | readonly string[];
 
   /**
    * passthrough the resolved object including 'usedNS', 'usedLang' etc into options object of postprocessors as 'i18nResolved' property
    * @default false
    */
-  postProcessPassResolved?: boolean
+  postProcessPassResolved?: boolean;
 
   /**
    * Allows null values as valid translation
    * @default false
    */
-  returnNull?: boolean
+  returnNull?: boolean;
 
   /**
    * Allows empty string as valid translation
    * @default true
    */
-  returnEmptyString?: boolean
+  returnEmptyString?: boolean;
 
   /**
    * Allows objects as valid translation result
    * @default false
    */
-  returnObjects?: boolean
+  returnObjects?: boolean;
 
   /**
    * Returns an object that includes information about the used language, namespace, key and value
    */
-  returnDetails?: boolean
+  returnDetails?: boolean;
 
   /**
    * Gets called if object was passed in as key but returnObjects was set to false
    * @default noop
    */
-  returnedObjectHandler?(key: string, value: string, options: any): void
+  returnedObjectHandler?(key: string, value: string, options: any): void;
 
   /**
    * Char, eg. '\n' that arrays will be joined by
    * @default false
    */
-  joinArrays?: false | string
+  joinArrays?: false | string;
 
   /**
    * Sets defaultValue
    * @default args => ({ defaultValue: args[1] })
    */
-  overloadTranslationOptionHandler?(args: string[]): TOptions
+  overloadTranslationOptionHandler?(args: string[]): TOptions;
 
   /**
    * @see https://www.i18next.com/interpolation.html
    */
-  interpolation?: InterpolationOptions
+  interpolation?: InterpolationOptions;
 
   /**
    * Options for react - check documentation of plugin
    * @default undefined
    */
-  react?: ReactOptions
+  react?: ReactOptions;
 
   /**
    * Triggers resource loading in init function inside a setTimeout (default async behaviour).
@@ -565,43 +554,43 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * init is possible without relaying on the init callback.
    * @default true
    */
-  initImmediate?: boolean
+  initImmediate?: boolean;
 
   /**
    * Char to separate keys
    * @default '.'
    */
-  keySeparator?: false | string
+  keySeparator?: false | string;
 
   /**
    * Char to split namespace from key
    * @default ':'
    */
-  nsSeparator?: false | string
+  nsSeparator?: false | string;
 
   /**
    * Char to split plural from key
    * @default '_'
    */
-  pluralSeparator?: string
+  pluralSeparator?: string;
 
   /**
    * Char to split context from key
    * @default '_'
    */
-  contextSeparator?: string
+  contextSeparator?: string;
 
   /**
    * Prefixes the namespace to the returned key when using `cimode`
    * @default false
    */
-  appendNamespaceToCIMode?: boolean
+  appendNamespaceToCIMode?: boolean;
 
   /**
    * Compatibility JSON version
    * @default 'v4'
    */
-  compatibilityJSON?: "v1" | "v2" | "v3" | "v4"
+  compatibilityJSON?: 'v1' | 'v2' | 'v3' | 'v4';
 
   /**
    * Options for https://github.com/locize/locize-lastused
@@ -611,44 +600,44 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
     /**
      * The id of your locize project
      */
-    projectId: string
+    projectId: string;
 
     /**
      * An api key if you want to send missing keys
      */
-    apiKey?: string
+    apiKey?: string;
 
     /**
      * The reference language of your project
      * @default 'en'
      */
-    referenceLng?: string
+    referenceLng?: string;
 
     /**
      * Version
      * @default 'latest'
      */
-    version?: string
+    version?: string;
 
     /**
      * Debounce interval to send data in milliseconds
      * @default 90000
      */
-    debounceSubmit?: number
+    debounceSubmit?: number;
 
     /**
      * Hostnames that are allowed to send last used data.
      * Please keep those to your local system, staging, test servers (not production)
      * @default ['localhost']
      */
-    allowedHosts?: readonly string[]
-  }
+    allowedHosts?: readonly string[];
+  };
 
   /**
    * Automatically lookup for a flat key if a nested key is not found an vice-versa
    * @default true
    */
-  ignoreJSONStructure?: boolean
+  ignoreJSONStructure?: boolean;
 
   /**
    * Limit parallelism of calls to backend
@@ -657,7 +646,7 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * and actually make the entire process take longer.
    * @default 10
    */
-  maxParallelReads?: number
+  maxParallelReads?: number;
 
   /**
    * The maximum number of retries to perform.
@@ -666,7 +655,7 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * The default value is used if value is set below 0.
    * @default 5
    */
-  maxRetries?: number
+  maxRetries?: number;
 
   /**
    * Set how long to wait, in milliseconds, betweeen retries of failed requests.
@@ -674,162 +663,158 @@ export interface InitOptions<T = object> extends PluginOptions<T> {
    * The default value is used if value is set below 1ms.
    * @default 350
    */
-  retryTimeout?: number
+  retryTimeout?: number;
 }
 
 export interface TOptionsBase {
   /**
    * Default value to return if a translation was not found
    */
-  defaultValue?: any
+  defaultValue?: any;
   /**
    * Count value used for plurals
    */
-  count?: number
+  count?: number;
   /**
    * Ordinal flag for ordinal plurals
    */
-  ordinal?: boolean
+  ordinal?: boolean;
   /**
    * Used for contexts (eg. male\female)
    */
-  context?: any
+  context?: any;
   /**
    * Object with vars for interpolation - or put them directly in options
    */
-  replace?: any
+  replace?: any;
   /**
    * Override language to use
    */
-  lng?: string
+  lng?: string;
   /**
    * Override languages to use
    */
-  lngs?: readonly string[]
+  lngs?: readonly string[];
   /**
    * Override language to lookup key if not found see fallbacks for details
    */
-  fallbackLng?: FallbackLng
+  fallbackLng?: FallbackLng;
   /**
    * Override namespaces (string or array)
    */
-  ns?: Namespace
+  ns?: Namespace;
   /**
    * Override char to separate keys
    */
-  keySeparator?: false | string
+  keySeparator?: false | string;
   /**
    * Override char to split namespace from key
    */
-  nsSeparator?: false | string
+  nsSeparator?: false | string;
   /**
    * Accessing an object not a translation string (can be set globally too)
    */
-  returnObjects?: boolean
+  returnObjects?: boolean;
   /**
    * Returns an object that includes information about the used language, namespace, key and value
    */
-  returnDetails?: boolean
+  returnDetails?: boolean;
   /**
    * Char, eg. '\n' that arrays will be joined by (can be set globally too)
    */
-  joinArrays?: string
+  joinArrays?: string;
   /**
    * String or array of postProcessors to apply see interval plurals as a sample
    */
-  postProcess?: string | readonly string[]
+  postProcess?: string | readonly string[];
   /**
    * Override interpolation options
    */
-  interpolation?: InterpolationOptions
+  interpolation?: InterpolationOptions;
 }
 
 // Type Options
-type _ReturnObjects = TypeOptions["returnObjects"]
-type _ReturnNull = TypeOptions["returnNull"]
-type _KeySeparator = TypeOptions["keySeparator"]
-type _NsSeparator = TypeOptions["nsSeparator"]
-type _PluralSeparator = TypeOptions["pluralSeparator"]
-type _DefaultNamespace = TypeOptions["defaultNS"]
-type _Resources = TypeOptions["resources"]
-type _JSONFormat = TypeOptions["jsonFormat"]
-type _InterpolationPrefix = TypeOptions["interpolationPrefix"]
-type _InterpolationSuffix = TypeOptions["interpolationSuffix"]
+type _ReturnObjects = TypeOptions['returnObjects'];
+type _ReturnNull = TypeOptions['returnNull'];
+type _KeySeparator = TypeOptions['keySeparator'];
+type _NsSeparator = TypeOptions['nsSeparator'];
+type _PluralSeparator = TypeOptions['pluralSeparator'];
+type _DefaultNamespace = TypeOptions['defaultNS'];
+type _Resources = TypeOptions['resources'];
+type _JSONFormat = TypeOptions['jsonFormat'];
+type _InterpolationPrefix = TypeOptions['interpolationPrefix'];
+type _InterpolationSuffix = TypeOptions['interpolationSuffix'];
 
-type Resources = $ValueIfResourcesDefined<_Resources, $Dictionary<string>>
-export type FlatNamespace = $PreservedValue<keyof _Resources, string>
-export type Namespace<T = FlatNamespace> = T | readonly T[]
+type Resources = $ValueIfResourcesDefined<_Resources, $Dictionary<string>>;
+export type FlatNamespace = $PreservedValue<keyof _Resources, string>;
+export type Namespace<T = FlatNamespace> = T | readonly T[];
 
-export type TOptions<TInterpolationMap extends object = $Dictionary> =
-  TOptionsBase & TInterpolationMap
+export type TOptions<TInterpolationMap extends object = $Dictionary> = TOptionsBase &
+  TInterpolationMap;
 
-type PluralSuffix = "zero" | "one" | "two" | "few" | "many" | "other"
+type PluralSuffix = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
 
-type WithOrWithoutPlural<Key> = _JSONFormat extends "v4"
+type WithOrWithoutPlural<Key> = _JSONFormat extends 'v4'
   ? Key extends `${infer KeyWithoutOrdinalPlural}${_PluralSeparator}ordinal${_PluralSeparator}${PluralSuffix}`
     ? KeyWithoutOrdinalPlural | Key
     : Key extends `${infer KeyWithoutPlural}${_PluralSeparator}${PluralSuffix}`
-      ? KeyWithoutPlural | Key
-      : Key
-  : Key
+    ? KeyWithoutPlural | Key
+    : Key
+  : Key;
 
-type JoinKeys<K1, K2> = `${K1 & string}${_KeySeparator}${K2 & string}`
-type AppendNamespace<Ns, Keys> = `${Ns & string}${_NsSeparator}${Keys & string}`
+type JoinKeys<K1, K2> = `${K1 & string}${_KeySeparator}${K2 & string}`;
+type AppendNamespace<Ns, Keys> = `${Ns & string}${_NsSeparator}${Keys & string}`;
 
 /******************************************************
  * Build all keys and key prefixes based on Resources *
  ******************************************************/
 type KeysBuilderWithReturnObjects<Res, Key = keyof Res> = Key extends keyof Res
   ? Res[Key] extends $Dictionary
-    ? | JoinKeys<Key, WithOrWithoutPlural<keyof $OmitArrayKeys<Res[Key]>>>
-      | JoinKeys<Key, KeysBuilderWithReturnObjects<Res[Key]>>
+    ?
+        | JoinKeys<Key, WithOrWithoutPlural<keyof $OmitArrayKeys<Res[Key]>>>
+        | JoinKeys<Key, KeysBuilderWithReturnObjects<Res[Key]>>
     : never
-  : never
+  : never;
 
-type KeysBuilderWithoutReturnObjects<
-  Res,
-  Key = keyof $OmitArrayKeys<Res>,
-> = Key extends keyof Res
+type KeysBuilderWithoutReturnObjects<Res, Key = keyof $OmitArrayKeys<Res>> = Key extends keyof Res
   ? Res[Key] extends $Dictionary
     ? JoinKeys<Key, KeysBuilderWithoutReturnObjects<Res[Key]>>
     : Key
-  : never
+  : never;
 
 type KeysBuilder<Res, WithReturnObjects> = $IsResourcesDefined extends true
   ? WithReturnObjects extends true
     ? keyof Res | KeysBuilderWithReturnObjects<Res>
     : KeysBuilderWithoutReturnObjects<Res>
-  : string
+  : string;
 
 type KeysWithReturnObjects = {
-  [Ns in FlatNamespace]: WithOrWithoutPlural<KeysBuilder<Resources[Ns], true>>
-}
+  [Ns in FlatNamespace]: WithOrWithoutPlural<KeysBuilder<Resources[Ns], true>>;
+};
 type KeysWithoutReturnObjects = {
-  [Ns in FlatNamespace]: WithOrWithoutPlural<KeysBuilder<Resources[Ns], false>>
-}
+  [Ns in FlatNamespace]: WithOrWithoutPlural<KeysBuilder<Resources[Ns], false>>;
+};
 
-type ResourceKeys<WithReturnObjects = _ReturnObjects> =
-  WithReturnObjects extends true
-    ? KeysWithReturnObjects
-    : KeysWithoutReturnObjects
+type ResourceKeys<WithReturnObjects = _ReturnObjects> = WithReturnObjects extends true
+  ? KeysWithReturnObjects
+  : KeysWithoutReturnObjects;
 
 /************************************************************************
  * Parse t function keys based on the namespace, options and key prefix *
  ************************************************************************/
-type KeysByTOptions<TOpt extends TOptions> = TOpt["returnObjects"] extends true
+type KeysByTOptions<TOpt extends TOptions> = TOpt['returnObjects'] extends true
   ? ResourceKeys<true>
-  : ResourceKeys
+  : ResourceKeys;
 
-type NsByTOptions<
-  Ns extends Namespace,
-  TOpt extends TOptions,
-> = TOpt["ns"] extends Namespace ? TOpt["ns"] : Ns
+type NsByTOptions<Ns extends Namespace, TOpt extends TOptions> = TOpt['ns'] extends Namespace
+  ? TOpt['ns']
+  : Ns;
 
 type ParseKeysByKeyPrefix<Keys, KPrefix> = KPrefix extends string
   ? Keys extends `${KPrefix}${_KeySeparator}${infer Key}`
     ? Key
     : never
-  : Keys
+  : Keys;
 
 type ParseKeysByNamespaces<
   Ns extends Namespace,
@@ -839,7 +824,7 @@ type ParseKeysByNamespaces<
   ? UnionNsps extends keyof Keys
     ? AppendNamespace<UnionNsps, Keys[UnionNsps]>
     : never
-  : never
+  : never;
 
 type ParseKeys<
   Ns extends Namespace,
@@ -848,22 +833,21 @@ type ParseKeys<
   Keys extends $Dictionary = KeysByTOptions<TOpt>,
   ActualNS extends Namespace = NsByTOptions<Ns, TOpt>,
 > = $IsResourcesDefined extends true
-  ? | ParseKeysByKeyPrefix<Keys[$FirstNamespace<ActualNS>], KPrefix>
-    | ParseKeysByNamespaces<ActualNS, Keys>
-  : string
+  ?
+      | ParseKeysByKeyPrefix<Keys[$FirstNamespace<ActualNS>], KPrefix>
+      | ParseKeysByNamespaces<ActualNS, Keys>
+  : string;
 
 /*********************************************************
  * Parse t function return type and interpolation values *
  *********************************************************/
 type ParseInterpolationValues<Ret> =
   Ret extends `${string}${_InterpolationPrefix}${infer Value}${_InterpolationSuffix}${infer Rest}`
-    ? | (Value extends `${infer ActualValue},${string}` ? ActualValue : Value)
-      | ParseInterpolationValues<Rest>
-    : never
-type InterpolationMap<Ret> = Record<
-  $PreservedValue<ParseInterpolationValues<Ret>, string>,
-  any
->
+    ?
+        | (Value extends `${infer ActualValue},${string}` ? ActualValue : Value)
+        | ParseInterpolationValues<Rest>
+    : never;
+type InterpolationMap<Ret> = Record<$PreservedValue<ParseInterpolationValues<Ret>, string>, any>;
 
 type ParseTReturnPlural<
   Res,
@@ -874,22 +858,23 @@ type ParseTReturnPlural<
 > = KeyWithOrdinalPlural extends keyof Res
   ? Res[KeyWithOrdinalPlural]
   : KeyWithPlural extends keyof Res
-    ? Res[KeyWithPlural]
-    : $Value<Res, Key>
+  ? Res[KeyWithPlural]
+  : $Value<Res, Key>;
 
-type ParseTReturn<Key, Res> =
-  Key extends `${infer K1}${_KeySeparator}${infer RestKey}`
-    ? ParseTReturn<RestKey, $Value<Res, K1>>
-    : ParseTReturnPlural<Res, Key>
+type ParseTReturn<Key, Res> = Key extends `${infer K1}${_KeySeparator}${infer RestKey}`
+  ? ParseTReturn<RestKey, $Value<Res, K1>>
+  : ParseTReturnPlural<Res, Key>;
 
-type TReturnOptionalNull = _ReturnNull extends true ? null : never
+type TReturnOptionalNull = _ReturnNull extends true ? null : never;
 type TReturnOptionalObjects<TOpt extends TOptions> = _ReturnObjects extends true
   ? $SpecialObject
-  : TOpt["returnObjects"] extends true
-    ? $SpecialObject
-    : never
+  : TOpt['returnObjects'] extends true
+  ? $SpecialObject
+  : never;
 type DefaultTReturn<TOpt extends TOptions> =
-  string | TReturnOptionalObjects<TOpt> | TReturnOptionalNull
+  | string
+  | TReturnOptionalObjects<TOpt>
+  | TReturnOptionalNull;
 
 export type TFunctionReturn<
   Ns extends Namespace,
@@ -900,24 +885,20 @@ export type TFunctionReturn<
   ? Key extends `${infer Nsp}${_NsSeparator}${infer RestKey}`
     ? ParseTReturn<RestKey, $Value<Resources, Nsp>>
     : ParseTReturn<Key, Resources[$FirstNamespace<ActualNS>]>
-  : DefaultTReturn<TOpt>
+  : DefaultTReturn<TOpt>;
 
-type TFunctionReturnOptionalDetails<
-  Ret,
-  TOpt extends TOptions,
-> = TOpt["returnDetails"] extends true ? TFunctionDetailedResult<Ret> : Ret
+type TFunctionReturnOptionalDetails<Ret, TOpt extends TOptions> = TOpt['returnDetails'] extends true
+  ? TFunctionDetailedResult<Ret>
+  : Ret;
 
 type AppendKeyPrefix<Key, KPrefix> = KPrefix extends string
   ? `${KPrefix}${_KeySeparator}${Key & string}`
-  : Key
+  : Key;
 
 /**************************
  * T function declaration *
  **************************/
-export interface TFunction<
-  Ns extends Namespace = _DefaultNamespace,
-  KPrefix = undefined,
-> {
+export interface TFunction<Ns extends Namespace = _DefaultNamespace, KPrefix = undefined> {
   <
     Key extends ParseKeys<Ns, TOpt, KPrefix> | TemplateStringsArray,
     TOpt extends TOptions,
@@ -925,146 +906,120 @@ export interface TFunction<
   >(
     ...args:
       | [key: Key | Key[], options?: TOpt & InterpolationMap<Ret>]
-      | [
-          key: Key | Key[],
-          defaultValue: string,
-          options?: TOpt & InterpolationMap<Ret>,
-        ]
-  ): TFunctionReturnOptionalDetails<Ret, TOpt>
+      | [key: Key | Key[], defaultValue: string, options?: TOpt & InterpolationMap<Ret>]
+  ): TFunctionReturnOptionalDetails<Ret, TOpt>;
 }
 
-export type KeyPrefix<Ns extends Namespace> =
-  ResourceKeys<true>[$FirstNamespace<Ns>] | undefined
+export type KeyPrefix<Ns extends Namespace> = ResourceKeys<true>[$FirstNamespace<Ns>] | undefined;
 
 export interface WithT<Ns extends Namespace = _DefaultNamespace> {
   // Expose parameterized t in the i18next interface hierarchy
-  t: TFunction<Ns>
+  t: TFunction<Ns>;
 }
 
 export type TFunctionDetailedResult<T = string> = {
   /**
    * The plain used key
    */
-  usedKey: string
+  usedKey: string;
   /**
    * The translation result.
    */
-  res: T
+  res: T;
   /**
    * The key with context / plural
    */
-  exactUsedKey: string
+  exactUsedKey: string;
   /**
    * The used language for this translation.
    */
-  usedLng: string
+  usedLng: string;
   /**
    * The used namespace for this translation.
    */
-  usedNS: string
-}
+  usedNS: string;
+};
 
 export interface Resource {
-  [language: string]: ResourceLanguage
+  [language: string]: ResourceLanguage;
 }
 
 export interface ResourceLanguage {
-  [namespace: string]: ResourceKey
+  [namespace: string]: ResourceKey;
 }
 
 export type ResourceKey =
   | string
   | {
-      [key: string]: any
-    }
+      [key: string]: any;
+    };
 
 export interface Interpolator {
-  init(options: InterpolationOptions, reset: boolean): undefined
-  reset(): undefined
-  resetRegExp(): undefined
-  interpolate(
-    str: string,
-    data: object,
-    lng: string,
-    options: InterpolationOptions
-  ): string
-  nest(
-    str: string,
-    fc: (...args: any[]) => any,
-    options: InterpolationOptions
-  ): string
+  init(options: InterpolationOptions, reset: boolean): undefined;
+  reset(): undefined;
+  resetRegExp(): undefined;
+  interpolate(str: string, data: object, lng: string, options: InterpolationOptions): string;
+  nest(str: string, fc: (...args: any[]) => any, options: InterpolationOptions): string;
 }
 
 export class ResourceStore {
-  constructor(data: Resource, options: InitOptions)
+  constructor(data: Resource, options: InitOptions);
 
-  public data: Resource
-  public options: InitOptions
+  public data: Resource;
+  public options: InitOptions;
 
   /**
    * Gets fired when resources got added or removed
    */
-  on(
-    event: "added" | "removed",
-    callback: (lng: string, ns: string) => void
-  ): void
+  on(event: 'added' | 'removed', callback: (lng: string, ns: string) => void): void;
   /**
    * Remove event listener
    * removes all callback when callback not specified
    */
-  off(
-    event: "added" | "removed",
-    callback?: (lng: string, ns: string) => void
-  ): void
+  off(event: 'added' | 'removed', callback?: (lng: string, ns: string) => void): void;
 }
 
 export interface Formatter {
-  init(services: Services, i18nextOptions: InitOptions): void
-  add(
-    name: string,
-    fc: (value: any, lng: string | undefined, options: any) => string
-  ): void
+  init(services: Services, i18nextOptions: InitOptions): void;
+  add(name: string, fc: (value: any, lng: string | undefined, options: any) => string): void;
   addCached(
     name: string,
-    fc: (lng: string | undefined, options: any) => (value: any) => string
-  ): void
-  format: FormatFunction
+    fc: (lng: string | undefined, options: any) => (value: any) => string,
+  ): void;
+  format: FormatFunction;
 }
 
 export interface Services {
-  backendConnector: any
-  i18nFormat: any
-  interpolator: Interpolator
-  languageDetector: any
-  languageUtils: any
-  logger: any
-  pluralResolver: any
-  resourceStore: ResourceStore
-  formatter?: Formatter
+  backendConnector: any;
+  i18nFormat: any;
+  interpolator: Interpolator;
+  languageDetector: any;
+  languageUtils: any;
+  logger: any;
+  pluralResolver: any;
+  resourceStore: ResourceStore;
+  formatter?: Formatter;
 }
 
 export type ModuleType =
-  | "backend"
-  | "logger"
-  | "languageDetector"
-  | "postProcessor"
-  | "i18nFormat"
-  | "formatter"
-  | "3rdParty"
+  | 'backend'
+  | 'logger'
+  | 'languageDetector'
+  | 'postProcessor'
+  | 'i18nFormat'
+  | 'formatter'
+  | '3rdParty';
 
 export interface Module {
-  type: ModuleType
+  type: ModuleType;
 }
 
-export type CallbackError = Error | string | null | undefined
+export type CallbackError = Error | string | null | undefined;
 export type ReadCallback = (
   err: CallbackError,
-  data: ResourceKey | boolean | null | undefined
-) => void
-export type MultiReadCallback = (
-  err: CallbackError,
-  data: Resource | null | undefined
-) => void
+  data: ResourceKey | boolean | null | undefined,
+) => void;
+export type MultiReadCallback = (err: CallbackError, data: Resource | null | undefined) => void;
 
 /**
  * Used to load data for i18next.
@@ -1072,28 +1027,24 @@ export type MultiReadCallback = (
  * For singleton set property `type` to `'backend'` For a prototype constructor set static property.
  */
 export interface BackendModule<TOptions = object> extends Module {
-  type: "backend"
-  init(
-    services: Services,
-    backendOptions: TOptions,
-    i18nextOptions: InitOptions
-  ): void
-  read(language: string, namespace: string, callback: ReadCallback): void
+  type: 'backend';
+  init(services: Services, backendOptions: TOptions, i18nextOptions: InitOptions): void;
+  read(language: string, namespace: string, callback: ReadCallback): void;
   /** Save the missing translation */
   create?(
     languages: readonly string[],
     namespace: string,
     key: string,
-    fallbackValue: string
-  ): void
+    fallbackValue: string,
+  ): void;
   /** Load multiple languages and namespaces. For backends supporting multiple resources loading */
   readMulti?(
     languages: readonly string[],
     namespaces: readonly string[],
-    callback: MultiReadCallback
-  ): void
+    callback: MultiReadCallback,
+  ): void;
   /** Store the translation. For backends acting as cache layer */
-  save?(language: string, namespace: string, data: ResourceLanguage): void
+  save?(language: string, namespace: string, data: ResourceLanguage): void;
 }
 
 /**
@@ -1102,15 +1053,11 @@ export interface BackendModule<TOptions = object> extends Module {
  * For singleton set property `type` to `'languageDetector'` For a prototype constructor set static property.
  */
 export interface LanguageDetectorModule extends Module {
-  type: "languageDetector"
-  init?(
-    services: Services,
-    detectorOptions: object,
-    i18nextOptions: InitOptions
-  ): void
+  type: 'languageDetector';
+  init?(services: Services, detectorOptions: object, i18nextOptions: InitOptions): void;
   /** Must return detected language */
-  detect(): string | readonly string[] | undefined
-  cacheUserLanguage?(lng: string): void
+  detect(): string | readonly string[] | undefined;
+  cacheUserLanguage?(lng: string): void;
 }
 
 /**
@@ -1119,19 +1066,15 @@ export interface LanguageDetectorModule extends Module {
  * For singleton set property `type` to `'languageDetector'` For a prototype constructor set static property.
  */
 export interface LanguageDetectorAsyncModule extends Module {
-  type: "languageDetector"
+  type: 'languageDetector';
   /** Set to true to enable async detection */
-  async: true
-  init?(
-    services: Services,
-    detectorOptions: object,
-    i18nextOptions: InitOptions
-  ): void
+  async: true;
+  init?(services: Services, detectorOptions: object, i18nextOptions: InitOptions): void;
   /** Must call callback passing detected language or return a Promise*/
   detect(
-    callback: (lng: string | readonly string[] | undefined) => void | undefined
-  ): void | Promise<string | readonly string[] | undefined>
-  cacheUserLanguage?(lng: string): void | Promise<void>
+    callback: (lng: string | readonly string[] | undefined) => void | undefined,
+  ): void | Promise<string | readonly string[] | undefined>;
+  cacheUserLanguage?(lng: string): void | Promise<void>;
 }
 
 /**
@@ -1140,14 +1083,9 @@ export interface LanguageDetectorAsyncModule extends Module {
  */
 export interface PostProcessorModule extends Module {
   /** Unique name */
-  name: string
-  type: "postProcessor"
-  process(
-    value: string,
-    key: string | string[],
-    options: TOptions,
-    translator: any
-  ): string
+  name: string;
+  type: 'postProcessor';
+  process(value: string, key: string | string[], options: TOptions, translator: any): string;
 }
 
 /**
@@ -1155,43 +1093,43 @@ export interface PostProcessorModule extends Module {
  * Do not need to be a prototype function.
  */
 export interface LoggerModule extends Module {
-  type: "logger"
-  log(...args: any[]): void
-  warn(...args: any[]): void
-  error(...args: any[]): void
+  type: 'logger';
+  log(...args: any[]): void;
+  warn(...args: any[]): void;
+  error(...args: any[]): void;
 }
 
 export interface I18nFormatModule extends Module {
-  type: "i18nFormat"
+  type: 'i18nFormat';
 }
 
 export interface FormatterModule extends Module, Formatter {
-  type: "formatter"
+  type: 'formatter';
 }
 
 export interface ThirdPartyModule extends Module {
-  type: "3rdParty"
-  init(i18next: i18n): void
+  type: '3rdParty';
+  init(i18next: i18n): void;
 }
 
 export interface Modules {
-  backend?: BackendModule
-  logger?: LoggerModule
-  languageDetector?: LanguageDetectorModule | LanguageDetectorAsyncModule
-  i18nFormat?: I18nFormatModule
-  formatter?: FormatterModule
-  external: ThirdPartyModule[]
+  backend?: BackendModule;
+  logger?: LoggerModule;
+  languageDetector?: LanguageDetectorModule | LanguageDetectorAsyncModule;
+  i18nFormat?: I18nFormatModule;
+  formatter?: FormatterModule;
+  external: ThirdPartyModule[];
 }
 
 // helper to identify class https://stackoverflow.com/a/45983481/2363935
 export interface Newable<T> {
-  new (...args: any[]): T
+  new (...args: any[]): T;
 }
 export interface NewableModule<T extends Module> extends Newable<T> {
-  type: T["type"]
+  type: T['type'];
 }
 
-export type Callback = (error: any, t: TFunction) => void
+export type Callback = (error: any, t: TFunction) => void;
 
 /**
  * Uses similar args as the t function and returns true if a key exists.
@@ -1200,14 +1138,12 @@ export interface ExistsFunction<
   TKeys extends string = string,
   TInterpolationMap extends object = $Dictionary,
 > {
-  (key: TKeys | TKeys[], options?: TOptions<TInterpolationMap>): boolean
+  (key: TKeys | TKeys[], options?: TOptions<TInterpolationMap>): boolean;
 }
 
 export interface i18n {
   // Expose parameterized t in the i18next interface hierarchy
-  t: TFunction<
-    [_DefaultNamespace, ...Exclude<FlatNamespace, _DefaultNamespace>[]]
-  >
+  t: TFunction<[_DefaultNamespace, ...Exclude<FlatNamespace, _DefaultNamespace>[]]>;
 
   /**
    * The default of the i18next module is an i18next instance ready to be initialized by calling init.
@@ -1216,10 +1152,10 @@ export interface i18n {
    * @param options - Initial options.
    * @param callback - will be called after all translations were loaded or with an error when failed (in case of using a backend).
    */
-  init(callback?: Callback): Promise<TFunction>
-  init<T>(options: InitOptions<T>, callback?: Callback): Promise<TFunction>
+  init(callback?: Callback): Promise<TFunction>;
+  init<T>(options: InitOptions<T>, callback?: Callback): Promise<TFunction>;
 
-  loadResources(callback?: (err: any) => void): void
+  loadResources(callback?: (err: any) => void): void;
 
   /**
    * The use function is there to load additional plugins to i18next.
@@ -1227,34 +1163,32 @@ export interface i18n {
    *
    * @param module Accepts a class or object
    */
-  use<T extends Module>(module: T | NewableModule<T> | Newable<T>): this
+  use<T extends Module>(module: T | NewableModule<T> | Newable<T>): this;
 
   /**
    * List of modules used
    */
-  modules: Modules
+  modules: Modules;
 
   /**
    * Internal container for all used plugins and implementation details like languageUtils, pluralResolvers, etc.
    */
-  services: Services
+  services: Services;
 
   /**
    * Internal container for translation resources
    */
-  store: ResourceStore
+  store: ResourceStore;
 
   /**
    * Uses similar args as the t function and returns true if a key exists.
    */
-  exists: ExistsFunction
+  exists: ExistsFunction;
 
   /**
    * Returns a resource data by language.
    */
-  getDataByLanguage(
-    lng: string
-  ): { [key: string]: { [key: string]: string } } | undefined
+  getDataByLanguage(lng: string): { [key: string]: { [key: string]: string } } | undefined;
 
   /**
    * Returns a t function that defaults to given language or namespace.
@@ -1271,46 +1205,40 @@ export interface i18n {
     ...args:
       | [lng: string | readonly string[], ns?: Ns, keyPrefix?: TKPrefix]
       | [lng: null, ns: Ns, keyPrefix?: TKPrefix]
-  ): TFunction<ActualNs, TKPrefix>
+  ): TFunction<ActualNs, TKPrefix>;
 
   /**
    * Changes the language. The callback will be called as soon translations were loaded or an error occurs while loading.
    * HINT: For easy testing - setting lng to 'cimode' will set t function to always return the key.
    */
-  changeLanguage(lng?: string, callback?: Callback): Promise<TFunction>
+  changeLanguage(lng?: string, callback?: Callback): Promise<TFunction>;
 
   /**
    * Is set to the current detected or set language.
    * If you need the primary used language depending on your configuration (supportedLngs, load) you will prefer using i18next.languages[0].
    */
-  language: string
+  language: string;
 
   /**
    * Is set to an array of language-codes that will be used it order to lookup the translation value.
    */
-  languages: readonly string[]
+  languages: readonly string[];
 
   /**
    * Is set to the current resolved language.
    * It can be used as primary used language, for example in a language switcher.
    */
-  resolvedLanguage?: string
+  resolvedLanguage?: string;
 
   /**
    * Loads additional namespaces not defined in init options.
    */
-  loadNamespaces(
-    ns: string | readonly string[],
-    callback?: Callback
-  ): Promise<void>
+  loadNamespaces(ns: string | readonly string[], callback?: Callback): Promise<void>;
 
   /**
    * Loads additional languages not defined in init options (preload).
    */
-  loadLanguages(
-    lngs: string | readonly string[],
-    callback?: Callback
-  ): Promise<void>
+  loadLanguages(lngs: string | readonly string[], callback?: Callback): Promise<void>;
 
   /**
    * Reloads resources on given state. Optionally you can pass an array of languages and namespaces as params if you don't want to reload all.
@@ -1318,36 +1246,29 @@ export interface i18n {
   reloadResources(
     lngs?: string | readonly string[],
     ns?: string | readonly string[],
-    callback?: () => void
-  ): Promise<void>
-  reloadResources(
-    lngs: null,
-    ns: string | readonly string[],
-    callback?: () => void
-  ): Promise<void>
+    callback?: () => void,
+  ): Promise<void>;
+  reloadResources(lngs: null, ns: string | readonly string[], callback?: () => void): Promise<void>;
 
   /**
    * Changes the default namespace.
    */
-  setDefaultNamespace(ns: string): void
+  setDefaultNamespace(ns: string): void;
 
   /**
    * Checks if a namespace has been loaded.
    */
-  hasLoadedNamespace(
-    ns: string,
-    options?: Pick<InitOptions, "fallbackLng">
-  ): boolean
+  hasLoadedNamespace(ns: string, options?: Pick<InitOptions, 'fallbackLng'>): boolean;
 
   /**
    * Returns rtl or ltr depending on languages read direction.
    */
-  dir(lng?: string): "ltr" | "rtl"
+  dir(lng?: string): 'ltr' | 'rtl';
 
   /**
    * Exposes interpolation.format function added on init.
    */
-  format: FormatFunction
+  format: FormatFunction;
 
   /**
    * Will return a new i18next instance.
@@ -1355,73 +1276,60 @@ export interface i18n {
    * Providing a callback will automatically call init.
    * The callback will be called after all translations were loaded or with an error when failed (in case of using a backend).
    */
-  createInstance(options?: InitOptions, callback?: Callback): i18n
+  createInstance(options?: InitOptions, callback?: Callback): i18n;
 
   /**
    * Creates a clone of the current instance. Shares store, plugins and initial configuration.
    * Can be used to create an instance sharing storage but being independent on set language or namespaces.
    */
-  cloneInstance(options?: InitOptions, callback?: Callback): i18n
+  cloneInstance(options?: InitOptions, callback?: Callback): i18n;
 
   /**
    * Gets fired after initialization.
    */
-  on(event: "initialized", callback: (options: InitOptions) => void): void
+  on(event: 'initialized', callback: (options: InitOptions) => void): void;
 
   /**
    * Gets fired on loaded resources.
    */
   on(
-    event: "loaded",
-    callback: (loaded: {
-      [language: string]: { [namespace: string]: boolean }
-    }) => void
-  ): void
+    event: 'loaded',
+    callback: (loaded: { [language: string]: { [namespace: string]: boolean } }) => void,
+  ): void;
 
   /**
    * Gets fired if loading resources failed.
    */
-  on(
-    event: "failedLoading",
-    callback: (lng: string, ns: string, msg: string) => void
-  ): void
+  on(event: 'failedLoading', callback: (lng: string, ns: string, msg: string) => void): void;
 
   /**
    * Gets fired on accessing a key not existing.
    */
   on(
-    event: "missingKey",
-    callback: (
-      lngs: readonly string[],
-      namespace: string,
-      key: string,
-      res: string
-    ) => void
-  ): void
+    event: 'missingKey',
+    callback: (lngs: readonly string[], namespace: string, key: string, res: string) => void,
+  ): void;
 
   /**
    * Gets fired when resources got added or removed.
    */
-  on(
-    event: "added" | "removed",
-    callback: (lng: string, ns: string) => void
-  ): void
+  on(event: 'added' | 'removed', callback: (lng: string, ns: string) => void): void;
 
   /**
    * Gets fired when changeLanguage got called.
    */
-  on(event: "languageChanged", callback: (lng: string) => void): void
+  on(event: 'languageChanged', callback: (lng: string) => void): void;
 
   /**
    * Event listener
    */
-  on(event: string, listener: (...args: any[]) => void): void
+  on(event: string, listener: (...args: any[]) => void): void;
 
   /**
    * Remove event listener
    * removes all callback when callback not specified
    */
-  off(event: string, listener?: (...args: any[]) => void): void
+  off(event: string, listener?: (...args: any[]) => void): void;
 
   /**
    * Gets one value by given key.
@@ -1430,8 +1338,8 @@ export interface i18n {
     lng: string,
     ns: string,
     key: string,
-    options?: Pick<InitOptions, "keySeparator" | "ignoreJSONStructure">
-  ): any
+    options?: Pick<InitOptions, 'keySeparator' | 'ignoreJSONStructure'>,
+  ): any;
 
   /**
    * Adds one key/value.
@@ -1441,13 +1349,13 @@ export interface i18n {
     ns: string,
     key: string,
     value: string,
-    options?: { keySeparator?: string; silent?: boolean }
-  ): i18n
+    options?: { keySeparator?: string; silent?: boolean },
+  ): i18n;
 
   /**
    * Adds multiple key/values.
    */
-  addResources(lng: string, ns: string, resources: any): i18n
+  addResources(lng: string, ns: string, resources: any): i18n;
 
   /**
    * Adds a complete bundle.
@@ -1459,55 +1367,55 @@ export interface i18n {
     ns: string,
     resources: any,
     deep?: boolean,
-    overwrite?: boolean
-  ): i18n
+    overwrite?: boolean,
+  ): i18n;
 
   /**
    * Checks if a resource bundle exists.
    */
-  hasResourceBundle(lng: string, ns: string): boolean
+  hasResourceBundle(lng: string, ns: string): boolean;
 
   /**
    * Returns a resource bundle.
    */
-  getResourceBundle(lng: string, ns: string): any
+  getResourceBundle(lng: string, ns: string): any;
 
   /**
    * Removes an existing bundle.
    */
-  removeResourceBundle(lng: string, ns: string): i18n
+  removeResourceBundle(lng: string, ns: string): i18n;
 
   /**
    * Current options
    */
-  options: InitOptions
+  options: InitOptions;
 
   /**
    * Is initialized
    */
-  isInitialized: boolean
+  isInitialized: boolean;
 
   /**
    * Emit event
    */
-  emit(eventName: string): void
+  emit(eventName: string): void;
 }
 
-declare const i18next: i18n
-export default i18next
+declare const i18next: i18n;
+export default i18next;
 
-export const createInstance: i18n["createInstance"]
+export const createInstance: i18n['createInstance'];
 
-export const dir: i18n["dir"]
-export const init: i18n["init"]
-export const loadResources: i18n["loadResources"]
-export const reloadResources: i18n["reloadResources"]
-export const use: i18n["use"]
-export const changeLanguage: i18n["changeLanguage"]
-export const getFixedT: i18n["getFixedT"]
-export const t: i18n["t"]
-export const exists: i18n["exists"]
-export const setDefaultNamespace: i18n["setDefaultNamespace"]
-export const hasLoadedNamespace: i18n["hasLoadedNamespace"]
-export const loadNamespaces: i18n["loadNamespaces"]
-export const loadLanguages: i18n["loadLanguages"]
+export const dir: i18n['dir'];
+export const init: i18n['init'];
+export const loadResources: i18n['loadResources'];
+export const reloadResources: i18n['reloadResources'];
+export const use: i18n['use'];
+export const changeLanguage: i18n['changeLanguage'];
+export const getFixedT: i18n['getFixedT'];
+export const t: i18n['t'];
+export const exists: i18n['exists'];
+export const setDefaultNamespace: i18n['setDefaultNamespace'];
+export const hasLoadedNamespace: i18n['hasLoadedNamespace'];
+export const loadNamespaces: i18n['loadNamespaces'];
+export const loadLanguages: i18n['loadLanguages'];
