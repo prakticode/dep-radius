@@ -1,0 +1,102 @@
+---
+title: Which upgrade broke this?
+description: Something broke after dependency updates were merged. Find which changes affect your code, and where.
+icon: Search
+---
+
+## The situation
+
+Something broke. In the last week, several dependency updates were merged: a few bot pull requests,
+maybe a lockfile refresh. Dozens of packages changed. Which one caused it?
+
+Reading every release note of every package would take hours. radius gives you a short list instead.
+
+## The steps
+
+<Steps>
+<Step>
+
+### 1. Find the last commit where it worked
+
+A release tag, the last good deploy, or a commit from `git log`. For example `v1.4.0`.
+
+</Step>
+<Step>
+
+### 2. Run radius since that commit
+
+```sh
+npx dep-radius --since v1.4.0
+```
+
+radius compares the lockfile at `v1.4.0` with your current code. Nothing needs to be installed.
+
+</Step>
+<Step>
+
+### 3. Read the list
+
+For every direct dependency whose version changed, radius shows:
+
+- the release notes that affect your code, with the files and lines,
+- the notes it couldn't link to your code,
+- anything removed that your code still calls.
+
+Start with **blocked**, then with the notes that point at lines near the code that broke.
+
+</Step>
+</Steps>
+
+## An example
+
+A small project, where the last commit upgraded two packages. Real output, shortened:
+
+```txt
+express  4.21.2 → 5.0.0  major   REVIEW
+  5.0.0  breaking:  possibly
+    you use: redirect
+    src/app.js:8
+  ...
+
+qs  6.13.0 → 6.14.0  minor   REVIEW
+  6.13.1  [Fix] parse: avoid a crash with interpretNumericEntities: true, comma: true, and iso charset  cannot tie to your code
+  ...
+
+2 changed  0 quiet · 2 review · 0 blocked  · 0 unchanged
+```
+
+`src/app.js:8` is `res.redirect("back")`, which Express 5 no longer supports. If the settings page is
+what broke, that's the line to look at first.
+
+## Only some packages
+
+If you already suspect a few packages, name them:
+
+```sh
+npx dep-radius --since v1.4.0 express qs
+```
+
+## Ask your agent
+
+Give the list to your AI agent with the error:
+
+```md
+Something broke since v1.4.0. Here is the error: <paste the error>.
+Run `npx dep-radius --since v1.4.0 --json`. For each package that changed, check whether a listed
+line or note explains the error. Tell me which upgrade is the most likely cause, and why.
+```
+
+The [agent guide](/docs/agents) explains the JSON fields.
+
+## Good to know
+
+- **radius shows where to look, not the proof.** Confirm by testing, or by reverting the one upgrade
+  you suspect.
+- **To find the exact commit**, use `git bisect` between `v1.4.0` and now. radius then tells you what
+  changed in that commit: `npx dep-radius --since <commit>~1`.
+- **Only direct dependencies are listed**: the ones in your `package.json`. A change in a dependency
+  of a dependency isn't shown.
+- **A change nobody wrote in the notes is invisible to radius.** If nothing on the list explains the
+  error, that's a hint to look at undocumented changes, or outside the dependencies.
+- **The commit must exist locally.** In a shallow clone, fetch it first:
+  `git fetch --depth=1 origin v1.4.0`. Otherwise radius stops with "no such commit here".
