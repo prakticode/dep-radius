@@ -1,0 +1,160 @@
+---
+title: The behaviour change benchmark
+description: 39 real release notes that changed behaviour, and how many of them radius ties to the lines they affect. The misses included.
+icon: FlaskConical
+---
+
+radius claims one thing above all: it finds the documented behaviour changes that still compile and
+pass CI, and points at the lines they land on. This page measures that claim, on real release notes,
+and shows where it falls short.
+
+## The result
+
+**radius links 18 of 39 documented behaviour changes to the lines they affect (46%).**
+
+Of all the release notes it shows next to those changes, 35% are the change itself. The rest are
+notes that name something the project uses without being the change this case is about.
+
+The number that matters most is lower. The benchmark was built in two rounds:
+
+| Round                                                        | Cases | Caught |
+| ------------------------------------------------------------ | ----- | ------ |
+| The first 14, written while radius was being built           | 14    | 12     |
+| 25 more, each fixed before radius had ever run on it          | 25    | 6      |
+
+The first round was written by people who knew how radius matches notes, and it shows. The second
+round is the honest estimate: **about one documented behaviour change in four** reaches the right
+line today.
+
+**8 of the 21 misses are called quiet.** The upgrade changes behaviour the project relies on, the
+notes say so, and radius would let it through unread. That is the failure radius is built to avoid,
+and this benchmark is where it shows. The earlier [backtest](/docs/verdicts#why-quiet-is-hard-to-earn)
+found none because it only sees breaks that forced a code change.
+
+## What a case is
+
+Each case is a real upgrade, for example `dotenv` 16.6.1 to 17.0.0, with:
+
+- **the release notes of the new version, copied verbatim** from the GitHub release or the
+  changelog, never rewritten,
+- **a small project** that uses the package the way real code does, without extra names added so a
+  note would match,
+- **the lines the change lands on**, written before radius runs: the calls, constructors and
+  options objects that behave differently after the upgrade,
+- for changes about an option, **the package's real type declarations** for both versions, copied
+  from npm.
+
+A case is **caught** when radius shows the note describing the change and links it to at least one of
+those lines. Every case runs the full pipeline, offline, against a local copy of the registry and
+GitHub. The cases live in
+[`packages/core/tests/benchmark`](https://github.com/prakticode/dep-radius/tree/main/packages/core/tests/benchmark),
+and `pnpm benchmark` prints this page's numbers.
+
+Only changes that still compile count: a changed default, a stricter check, a different return
+value. A removed export is the types' job and is not measured here.
+
+## Caught
+
+| Package           | Upgrade          | The change                                              |
+| ----------------- | ---------------- | ------------------------------------------------------- |
+| `class-validator` | 0.13.2 → 0.14.0  | `forbidUnknownValues` is enabled by default             |
+| `commander`       | 12.1.0 → 13.0.0  | Excess command-arguments are an error by default        |
+| `date-fns`        | 3.3.0 → 3.3.1    | `getISOWeek` rounds again instead of truncating         |
+| `dotenv`          | 16.6.1 → 17.0.0  | `quiet` defaults to false: `config()` logs at startup   |
+| `express`         | 4.21.2 → 5.0.0   | `res.redirect('back')` is no longer a magic string      |
+| `express`         | 4.21.2 → 5.0.0   | `res.status()` only accepts integers                    |
+| `helmet`          | 7.2.0 → 8.0.0    | CSP directives like `self` must be quoted               |
+| `helmet`          | 7.2.0 → 8.0.0    | `Strict-Transport-Security` max-age is 365 days         |
+| `i18next`         | 22.5.1 → 23.0.0  | `returnNull` defaults to false                          |
+| `js-yaml`         | 3.14.1 → 4.0.0   | `dump()` drops keys whose value is `undefined`          |
+| `jsonwebtoken`    | 8.5.1 → 9.0.0    | `verify()` rejects unsigned tokens by default           |
+| `luxon`           | 3.2.1 → 3.3.0    | `Interval#count` no longer counts a midnight end day    |
+| `react-router`    | 7.8.1 → 7.8.2    | `generatePath()` encodes param values                   |
+| `semver`          | 7.6.3 → 7.7.0    | `inc()` validates the prerelease identifier             |
+| `socket.io`       | 2.3.0 → 3.0.0    | `Socket#join()` no longer takes a callback              |
+| `validator`       | 13.12.0 → 13.15.0 | `isEmail` rejects addresses starting with a quote      |
+| `zod`             | 4.4.3 → 4.5.0    | `z.iso.datetime()` requires seconds                     |
+| `zod`             | 4.4.3 → 4.5.0    | String length counts code points                        |
+
+## Missed, and why
+
+Every miss is a note that describes a real change, in a project that is affected by it, where no
+name links the two. They fall into four groups.
+
+### The note describes the change in words
+
+The note never names an API the code uses. Reading names can't connect it. Called quiet:
+`vue-router`.
+
+| Package      | Upgrade          | The note says                                              |
+| ------------ | ---------------- | ---------------------------------------------------------- |
+| `marked`     | 7.0.5 → 8.0.0    | "deprecated options removed" (`headerIds` is ignored)      |
+| `marked`     | 14.1.4 → 15.0.0  | "escape html in renderers instead of tokenizers"           |
+| `vue-router` | 5.0.6 → 5.0.7    | optional params are no longer set to an empty string       |
+| `yaml`       | 1.10.2 → 2.0.0   | "drop undefined values" when creating a mapping            |
+| `zod`        | 4.4.3 → 4.5.0    | "improve french translation", in the commit list only      |
+
+### The option is invisible to radius
+
+The note names an option, but radius can't tell that the code's call accepts it: the package ships no
+types of its own, its types live in another package, the option is nested (`retry.methods`), it is
+passed to a constructor, or the function comes from destructuring.
+
+Called quiet: `@tanstack/react-query`, `ajv`, `ky` and `qs`.
+
+| Package                 | Upgrade              | The option                                     |
+| ----------------------- | -------------------- | ---------------------------------------------- |
+| `@tanstack/react-query` | 5.100.13 → 5.100.14  | `subscribed`, declared in `query-core`         |
+| `ajv`                   | 7.2.4 → 8.0.0        | `strict`, passed to `new Ajv()`                |
+| `axios`                 | 1.15.2 → 1.16.0      | `maxContentLength` on the fetch adapter        |
+| `ioredis`               | 4.28.5 → 5.0.0       | `allowUsernameInURI`, types from `@types`      |
+| `ky`                    | 1.14.1 → 1.14.2      | `retry.methods`, nested                        |
+| `nodemailer`            | 8.0.11 → 9.0.0       | `tls`, types from `@types`                     |
+| `pg`                    | 7.18.2 → 8.0.0       | `rejectUnauthorized`, types from `@types`      |
+| `qs`                    | 6.14.0 → 6.14.1      | `arrayLimit`, types from `@types`              |
+| `react-hook-form`       | 7.61.1 → 7.62.0      | `onBlur` of `register`, from `useForm()`       |
+
+### The name is written as code, and not matched
+
+The note does name what the code uses, in a form radius doesn't read yet. Called quiet:
+`body-parser` 2.3.0 and `semver` 7.7.0.
+
+| Package       | Upgrade          | How the note names it                                   |
+| ------------- | ---------------- | ------------------------------------------------------- |
+| `body-parser` | 2.2.2 → 2.3.0    | `limit`, an option the code passes, without types       |
+| `semver`      | 7.6.3 → 7.7.0    | `diff:` as a commit prefix                              |
+| `sharp`       | 0.32.6 → 0.33.0  | `tint` as a bare code span, on a chained call           |
+
+### The name belongs to something else
+
+The note names an object radius doesn't attribute to the package, or a value that lives in a string.
+Called quiet: `tailwind-merge`.
+
+| Package          | Upgrade          | The name                                                |
+| ---------------- | ---------------- | ------------------------------------------------------- |
+| `body-parser`    | 1.20.3 → 2.0.0   | `req.body`, on Express's request                        |
+| `passport`       | 0.5.3 → 0.6.0    | `req#login()`, on Express's request                     |
+| `tailwind-merge` | 3.6.0 → 3.7.0    | `px` and `ps`, class names inside strings               |
+| `ws`             | 7.5.10 → 8.0.0   | the `'message'` event, a string                         |
+
+## What this does and doesn't show
+
+- **It measures linking, not frequency.** 39 hand-picked changes say how often radius connects a
+  documented change to the code it affects. They don't say how often such changes happen in your
+  upgrades.
+- **The projects are small.** A real project uses a package in more places, which can make a name
+  match easier, and more notes match by accident.
+- **A miss is not always a review.** 13 of the 21 missed upgrades still go to review, because they
+  are majors, or other notes and blind spots send them there; what they lose is the pointer to the
+  right line. The other 8 are called quiet, and a quiet verdict on them is wrong.
+- **Undocumented changes are out of scope.** A change nobody wrote down is invisible to any tool that
+  reads notes. Your tests remain the net for those.
+
+## Add a case
+
+A documented change radius should have caught is the most useful contribution there is. The
+benchmark's
+[README](https://github.com/prakticode/dep-radius/blob/main/packages/core/tests/benchmark/README.md)
+explains how to add one, or
+[open a "wrong verdict" issue](https://github.com/prakticode/dep-radius/issues/new/choose) with the
+package, the two versions and the note.
