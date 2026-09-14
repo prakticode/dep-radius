@@ -218,9 +218,11 @@ export function resolveRef(surface: Surface, ref: RawRef): Resolution {
       continue
     }
     if (seg.call || seg.construct) {
-      const next = seg.construct
-        ? (found.instanceOf ?? found.returns)
-        : found.returns
+      // a class is only ever constructed: `new Parser()` on the import itself reaches here as a call
+      const next =
+        seg.construct || found.kind === "class"
+          ? (found.instanceOf ?? found.returns)
+          : found.returns
       cursor = next ? { kind: "type", path: next } : undefined
       continue
     }
