@@ -13,5 +13,5 @@
   "expect": [
     "src/server.ts:5"
   ],
-  "status": "missed"
+  "status": "caught"
 }

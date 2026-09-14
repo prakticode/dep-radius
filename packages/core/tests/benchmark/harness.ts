@@ -1,5 +1,5 @@
 import { join, relative } from "node:path"
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 
 import { run } from "../../src/run.ts"
 import { splitEntries } from "../../src/notes/entries.ts"
@@ -104,17 +104,22 @@ export async function runCase(
 ): Promise<CaseResult> {
   const caseDir = join(dir, c.id)
   const notes = notesOf(c, caseDir)
+  // a case that needs the package's types ships its real declarations under package/<version>
+  const typesDir = join(caseDir, "package")
+  const withTypes = existsSync(typesDir)
   const tarball = (version: string) => ({
     version,
     publishedAt: "2026-01-01T00:00:00Z",
-    files: {
-      "package.json": JSON.stringify({
-        name: c.package,
-        version,
-        main: "index.js",
-      }),
-      "index.js": "module.exports = {}",
-    },
+    files: withTypes
+      ? readTree(join(typesDir, version))
+      : {
+          "package.json": JSON.stringify({
+            name: c.package,
+            version,
+            main: "index.js",
+          }),
+          "index.js": "module.exports = {}",
+        },
   })
   const registry = new FakeRegistry([
     {
@@ -141,10 +146,10 @@ export async function runCase(
     },
   })
   try {
-    // the notes net alone: types are another measurement
+    // the notes, with the types only where a case ships them: they tell which options a call takes
     const opts = testOptions(project.root, {
       specs: [`${c.package}@${c.to}`],
-      surface: false,
+      surface: withTypes,
     })
     const brief = await run(opts, testCtx(opts, registry))
     const pkg = brief.packages.find((p) => p.pkg === c.package)

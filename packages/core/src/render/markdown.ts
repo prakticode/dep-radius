@@ -9,6 +9,7 @@ import {
   siteLabel,
   sitesFor,
   surfaceLabel,
+  usedLabel,
 } from "./groups.ts"
 
 // A pull request comment: one table, then a section per package that needs a look.
@@ -72,7 +73,7 @@ function section(p: PackageBrief, now: number): string[] {
   for (const m of p.notes.matched) {
     const names = [...new Set(m.hits.map((h) => h.name))]
     lines.push(
-      `- ${m.entry.version}: ${m.entry.title}${m.direct ? "" : " _(possibly)_"}. You use ${names.map((n) => `\`${n}\``).join(", ")}`
+      `- ${m.entry.version}: ${m.entry.title}${m.direct ? "" : " _(possibly)_"}. ${capitalize(usedLabel(m.hits, (n) => `\`${n}\``))}`
     )
     const strong = m.hits
       .filter((h) => h.strength === "strong")
@@ -88,4 +89,8 @@ function section(p: PackageBrief, now: number): string[] {
   lines.push("")
   lines.push(`<sub>${p.reasons.map((r) => r.detail).join(" · ")}</sub>`)
   return lines
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }

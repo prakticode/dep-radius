@@ -216,6 +216,8 @@ export interface SurfaceSymbol {
   returns?: CanonPath
   instanceOf?: CanonPath
   aliasOf?: CanonPath
+  // the property names of the objects its parameters take: `config(options?: { quiet?: boolean })`
+  options?: string[]
   // a class or interface extending a type the surface cannot load: its inherited members are unseen
   unresolvedBase?: true
 }
@@ -299,6 +301,8 @@ export interface NoteHit {
   name: string
   strength: "strong" | "weak"
   region: RegionKind
+  // an option a function you call accepts, whether or not the code passes it
+  option?: true
 }
 
 export interface NoteMatch {

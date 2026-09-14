@@ -3,9 +3,15 @@
   "from": "16.6.1",
   "to": "17.0.0",
   "repository": "https://github.com/motdotla/dotenv",
-  "sources": { "17.0.0": "https://github.com/motdotla/dotenv/blob/master/CHANGELOG.md#1700-2025-06-27" },
-  "change": ["Default quiet to false"],
+  "sources": {
+    "17.0.0": "https://github.com/motdotla/dotenv/blob/master/CHANGELOG.md#1700-2025-06-27"
+  },
+  "change": [
+    "Default quiet to false"
+  ],
   "why": "config() logs a line at startup again, which breaks a CLI whose stdout is parsed. The note names the option, the code only calls config().",
-  "expect": ["src/env.ts:3"],
-  "status": "missed"
+  "expect": [
+    "src/env.ts:3"
+  ],
+  "status": "caught"
 }

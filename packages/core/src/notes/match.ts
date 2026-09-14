@@ -41,6 +41,39 @@ export interface MatchOptions {
   // share of the entries with examples a name must appear in before its examples stop counting;
   // Infinity turns demotion off (the backtest measures what it removes)
   demoteShare?: number
+  // option names the functions you call accept, from their types: a note about a default lands on
+  // the calls that never pass it
+  accepted?: string[]
+}
+
+// An option is named in a note's words or code spans, never in its examples: as a code-shaped
+// token (`returnNull`), as a whole code span (`quiet`, `quiet: true`), or as the header it sets
+// (`Content-Security-Policy` for contentSecurityPolicy).
+function optionHit(name: string, e: NoteEntry): RegionKind | undefined {
+  const token = new RegExp(`(?<![\\w$-])${escape(name)}(?![\\w$-])`)
+  const span = new RegExp(
+    `^\\s*\\{?\\s*${escape(name)}\\s*(?:[?:=].*)?\\}?\\s*$`
+  )
+  for (const r of e.regions) {
+    if (r.kind === "code-block") continue
+    if (isCodeShaped(name) && token.test(r.text)) return r.kind
+    if (r.kind === "inline-code" && span.test(r.text)) return r.kind
+    for (const header of r.text.match(
+      /[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+/g
+    ) ?? [])
+      if (camelCase(header) === name) return r.kind
+  }
+  return undefined
+}
+
+function camelCase(header: string): string {
+  return header
+    .toLowerCase()
+    .split("-")
+    .map((part, i) =>
+      i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)
+    )
+    .join("")
 }
 
 export const DEMOTE_SHARE = 0.25
@@ -52,6 +85,10 @@ export function matchNotes(
   options: MatchOptions = {}
 ): MatchResult {
   const share = options.demoteShare ?? DEMOTE_SHARE
+  // `h` of `{ h, s, l }` is a letter in any note, not an option anyone writes about
+  const accepted = (options.accepted ?? []).filter(
+    (name) => name.length >= 3 && !strong.includes(name) && !weak.includes(name)
+  )
   const live = entries.filter((e) => !e.noise)
   const names = [
     ...strong.map((name) => ({ name, strength: "strong" as const })),
@@ -95,6 +132,10 @@ export function matchNotes(
       }
       if (hitRegion)
         hits.push({ name: n.name, strength: n.strength, region: hitRegion })
+    }
+    for (const name of accepted) {
+      const region = optionHit(name, e)
+      if (region) hits.push({ name, strength: "weak", region, option: true })
     }
     if (hits.length > 0)
       matched.push({

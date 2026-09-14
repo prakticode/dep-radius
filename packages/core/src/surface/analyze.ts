@@ -11,10 +11,12 @@ import { entryPrefix, lastName, parsePath, resolveRef } from "../symbol-path.ts"
 import type {
   BlindSpotKind,
   Candidate,
+  CanonPath,
   Counted,
   PackageBrief,
   PackageUsage,
   Site,
+  Surface,
   SurfaceChange,
   SurfaceDelta,
   Touched,
@@ -24,6 +26,8 @@ import type {
 export type SurfaceOutcome = PackageBrief["surface"] & {
   incomplete?: boolean
   blindSpots?: Counted<BlindSpotKind>[]
+  // option names the functions you call accept, with the calls: what a note about an option lands on
+  options?: Record<string, Site[]>
 }
 
 export interface SurfaceContext {
@@ -107,9 +111,13 @@ export async function analyzeSurface(
     l.push(s)
     m.set(k, l)
   }
+  const byOption = new Map<string, Site[]>()
   for (const r of refs) {
     const res = resolveRef(a.surface, r)
-    for (const path of res.paths) add(byPath, path, r.site)
+    for (const path of res.paths) {
+      add(byPath, path, r.site)
+      for (const name of optionsAt(a.surface, path)) add(byOption, name, r.site)
+    }
     for (const name of res.unresolvedTail) add(byMember, name, r.site)
     if (res.missingHead) {
       missing.push(r.site)
@@ -204,6 +212,13 @@ export async function analyzeSurface(
         order(x) - order(y) || x.change.path.localeCompare(y.change.path)
     ),
     incomplete: !!detail,
+    ...(byOption.size > 0
+      ? {
+          options: Object.fromEntries(
+            [...byOption].map(([name, sites]) => [name, uniqueSites(sites)])
+          ),
+        }
+      : {}),
     ...(missing.length > 0
       ? {
           blindSpots: [
@@ -216,6 +231,12 @@ export async function analyzeSurface(
         }
       : {}),
   }
+}
+
+function optionsAt(surface: Surface, path: CanonPath): string[] {
+  let sym = surface.symbols[path]
+  for (let i = 0; i < 5 && sym?.aliasOf; i++) sym = surface.symbols[sym.aliasOf]
+  return sym?.options ?? []
 }
 
 function incompleteDetail(

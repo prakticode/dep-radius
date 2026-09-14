@@ -11,6 +11,7 @@ import {
   siteLabel,
   sitesFor,
   surfaceLabel,
+  usedLabel,
 } from "@dep-radius/core/render"
 
 export interface TerminalOptions {
@@ -184,7 +185,7 @@ function packageBlock(
       .filter((h) => h.strength === "strong")
       .map((h) => h.name)
     const sites = sitesFor(p, strongNames.length > 0 ? strongNames : names)
-    lines.push(c("dim", `    you use: ${names.join(", ")}`))
+    lines.push(c("dim", `    ${usedLabel(m.hits)}`))
     for (const s of sites.slice(0, m.direct ? Math.min(3, siteCap) : 1))
       lines.push(`    ${siteLabel(s)}`)
     if (sites.length > (m.direct ? Math.min(3, siteCap) : 1))

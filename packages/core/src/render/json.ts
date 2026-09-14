@@ -189,6 +189,7 @@ function packageV1(p: PackageBrief): PackageV1 {
           name: h.name,
           certainty: h.strength === "strong" ? "exact" : "by-name",
           where: h.region,
+          ...(h.option ? { option: true } : {}),
         })),
       })),
       breakingWithoutApi: p.notes.unattributedBreaking.map(entryV1),

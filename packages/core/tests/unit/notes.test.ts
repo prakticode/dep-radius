@@ -148,6 +148,49 @@ describe("matchNotes", () => {
   })
 })
 
+describe("matchNotes with the options of calls you make", () => {
+  const entries = splitEntries(
+    "8.0.0",
+    [
+      "- Default `quiet` to false",
+      "- The quiet flag is gone from the docs",
+      "- changed `returnNull` default to `false`",
+      "- **Breaking:** `Strict-Transport-Security` now has a max-age of 365 days",
+      "- `path: string[]` is accepted",
+      "- `h` and `s` values are rounded",
+      "### Examples",
+      "```js\nconfig({ quiet: true })\n```",
+    ].join("\n")
+  )
+  const titles = (accepted: string[], strong: string[] = []) =>
+    matchNotes(entries, strong, [], { accepted }).matched.map((m) => [
+      m.entry.title,
+      m.hits.map((h) => `${h.name}${h.option ? " (option)" : ""}`),
+    ])
+
+  it("matches an option as a code span, a code-shaped word or the header it sets", () => {
+    expect(
+      titles(["quiet", "returnNull", "strictTransportSecurity", "path"])
+    ).toEqual([
+      [
+        "**Breaking:** Strict-Transport-Security now has a max-age of 365 days",
+        ["strictTransportSecurity (option)"],
+      ],
+      ["Default quiet to false", ["quiet (option)"]],
+      ["changed returnNull default to false", ["returnNull (option)"]],
+      ["path: string[] is accepted", ["path (option)"]],
+    ])
+  })
+
+  it("never matches an option from prose words, examples or a single letter", () => {
+    expect(titles(["flag", "config", "h", "s"])).toEqual([])
+  })
+
+  it("leaves a name the code uses to the usual rules", () => {
+    expect(titles(["quiet"], ["quiet"])).toEqual([])
+  })
+})
+
 describe("parseRepository", () => {
   it("reads every common form", () => {
     expect(
