@@ -9,9 +9,12 @@ import type { LockReader } from "./types.ts"
 //           version: 1.3.0
 export function pnpmLock(text: string): LockReader | undefined {
   const importers = new Map<string, Map<string, string>>()
+  // v6+ records the specifier next to the version; v5 keeps them apart, and is left unchecked
+  const specifiers = new Map<string, Map<string, string>>()
   const lines = text.split(/\r?\n/)
   let inImporters = false
   let importer: Map<string, string> | undefined
+  let importerSpecs: Map<string, string> | undefined
   let inDeps = false
   let depKey: string | undefined
 
@@ -28,7 +31,9 @@ export function pnpmLock(text: string): LockReader | undefined {
     if (indent === 2) {
       const name = unquote(content.replace(/:$/, ""))
       importer = new Map()
+      importerSpecs = new Map()
       importers.set(name, importer)
+      specifiers.set(name, importerSpecs)
       inDeps = false
       continue
     }
@@ -51,6 +56,8 @@ export function pnpmLock(text: string): LockReader | undefined {
     if (indent === 8 && depKey) {
       const m = /^version:\s*(.+)$/.exec(content)
       if (m?.[1]) importer.set(depKey, unquote(m[1]))
+      const s = /^specifier:\s*(.+)$/.exec(content)
+      if (s?.[1]) importerSpecs?.set(depKey, unquote(s[1]))
     }
   }
   if (importers.size === 0) return undefined
@@ -70,7 +77,16 @@ export function pnpmLock(text: string): LockReader | undefined {
         v = alias[2]
       }
       v = v.replace(/^\/.*\//, "")
-      return /^\d/.test(v) ? { version: v, name } : undefined
+      const specs = specifiers.get(manifestDir)
+      const specifier =
+        specs && specs.size > 0 ? (specs.get(key) ?? null) : undefined
+      return /^\d/.test(v)
+        ? {
+            version: v,
+            name,
+            ...(specifier !== undefined ? { specifier } : {}),
+          }
+        : undefined
     },
   }
 }

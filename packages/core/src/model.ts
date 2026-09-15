@@ -65,6 +65,17 @@ export interface InstalledDep {
   local: boolean
   declaredBy: { manifest: string; key: string; field: DepField }[]
   flags: InstalledFlag[]
+  // versions found in a source the manifest does not allow, so the next source was read instead
+  outOfSync?: OutOfSync[]
+}
+
+export interface OutOfSync {
+  source: VersionSource
+  version: string
+  // what the manifest declares
+  spec: string
+  // the ref, when the versions were read at a commit for --since
+  at?: string
 }
 
 export interface NotAnalyzed {
@@ -370,6 +381,7 @@ export type ReasonCode =
   | "opaque-usage"
   | "not-referenced"
   | "flagged-install"
+  | "out-of-sync"
   | "surface-incomplete"
   | "no-evidence"
   | "major-unproven"

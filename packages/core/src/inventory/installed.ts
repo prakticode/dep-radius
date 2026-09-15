@@ -16,6 +16,7 @@ import type {
   Inventory,
   Manifest,
   NotAnalyzed,
+  OutOfSync,
 } from "../model.ts"
 
 export interface InventoryOptions {
@@ -104,6 +105,55 @@ async function loadLock(root: string): Promise<FoundLock | undefined> {
   }
 }
 
+// Packages the project forces to another version: npm `overrides`, yarn `resolutions`, pnpm
+// `pnpm.overrides` or the `overrides` of pnpm-workspace.yaml. Their lockfile entries legitimately
+// disagree with the manifest. Selectors such as `a>b`, `**/b` or `b@<2` name b; a name read too
+// widely only means one fewer check.
+async function overriddenNames(dirs: string[]): Promise<Set<string>> {
+  const names = new Set<string>()
+  const add = (selector: string) => {
+    const last = selector.split(">").at(-1)?.split("**/").at(-1)?.trim() ?? ""
+    const scoped = /^(@[^/@]+\/[^/@]+)/.exec(last)
+    const name =
+      scoped?.[1] ?? /^([^/@]+)/.exec(last.split("/").at(-1) ?? "")?.[1]
+    if (name) names.add(name)
+  }
+  const walk = (value: unknown) => {
+    if (!value || typeof value !== "object") return
+    for (const [k, v] of Object.entries(value)) {
+      if (k !== ".") add(k)
+      walk(v)
+    }
+  }
+  for (const dir of dirs) {
+    try {
+      const pj = JSON.parse(
+        await readFile(join(dir, "package.json"), "utf8")
+      ) as {
+        overrides?: unknown
+        resolutions?: unknown
+        pnpm?: { overrides?: unknown }
+      }
+      walk(pj.overrides)
+      walk(pj.resolutions)
+      walk(pj.pnpm?.overrides)
+    } catch {
+      // no manifest here
+    }
+    try {
+      const ws = await readFile(join(dir, "pnpm-workspace.yaml"), "utf8")
+      const block = /^overrides:\s*\n((?:[ \t]+.*\n?)*)/m.exec(ws)
+      for (const line of block?.[1]?.split("\n") ?? []) {
+        const m = /^\s+['"]?([^'":]+?)['"]?\s*:/.exec(line)
+        if (m?.[1]) add(m[1])
+      }
+    } catch {
+      // no workspace file
+    }
+  }
+  return names
+}
+
 async function patchedNames(root: string): Promise<Set<string>> {
   const names = new Set<string>()
   try {
@@ -163,6 +213,7 @@ export async function buildInventory(
   const lock = await loadLock(root)
   const patched = await patchedNames(root)
   const lockDir = lock?.dir ?? root
+  const overridden = await overriddenNames([...new Set([root, lockDir])])
   const hasPnp =
     existsSync(join(lockDir, ".pnp.cjs")) ||
     existsSync(join(lockDir, ".pnp.js"))
@@ -197,7 +248,7 @@ export async function buildInventory(
         })
         continue
       }
-      const found = await resolveDep(root, m, d, lock, hasPnp)
+      const found = await resolveDep(root, m, d, lock, hasPnp, overridden)
       if (!found) {
         if (workspaceNames.has(d.key)) local.add(d.key)
         else
@@ -218,6 +269,8 @@ export async function buildInventory(
       if (!dep) {
         dep = found
         byId.set(found.id, dep)
+      } else if (found.outOfSync) {
+        dep.outOfSync = [...(dep.outOfSync ?? []), ...found.outOfSync]
       }
       dep.declaredBy.push({
         manifest: relPath(root, m.path),
@@ -249,15 +302,58 @@ async function resolveDep(
   m: Manifest,
   d: DeclaredDep,
   lock: FoundLock | undefined,
-  hasPnp: boolean
+  hasPnp: boolean,
+  overridden: Set<string>
 ): Promise<InstalledDep | undefined> {
+  const outOfSync: OutOfSync[] = []
+  const withSkipped = (dep: InstalledDep): InstalledDep =>
+    outOfSync.length > 0 ? { ...dep, outOfSync } : dep
+
+  // What the manifest installs this key with: a peer range beside a real declaration is not installed.
+  const installing = m.deps.filter(
+    (o) => o.key === d.key && o.field !== "peerDependencies"
+  )
+  const declarations = installing.length > 0 ? installing : [d]
+  const allowed = (version: string) =>
+    declarations.some((o) => allowedBy(o)(version))
+
+  // A lockfile written for another specifier predates the manifest: `npm ci` refuses it, and the
+  // next install replaces the version. A bot pull request that bumps a pin without refreshing the
+  // lockfile leaves exactly that. The specifier alone cannot tell, since an override or a catalog
+  // is recorded under its own value, so a stale entry must also fall outside the declared range,
+  // and an overridden package is never judged.
+  const hit = lock?.reader.lookup(relPath(lock.dir, m.dir), d.key, d.spec)
+  const recorded =
+    hit?.specifier !== undefined &&
+    declarations.some((o) => o.spec === hit.specifier)
+  const lockStale =
+    hit !== undefined &&
+    hit.specifier !== undefined &&
+    !recorded &&
+    !overridden.has(d.key) &&
+    !allowed(hit.version)
+
   if (!hasPnp) {
     const r = await resolveInstalled(m.dir, d.key, projectBoundary(root))
-    if (r) {
+    // node_modules is behind the project when it differs from a lockfile written for this very
+    // specifier, or, with a stale lockfile too, when the manifest does not even allow it. A linked
+    // workspace package is the project's own code, whatever version it carries.
+    const behind =
+      !!r &&
+      !r.local &&
+      !!hit &&
+      (lockStale ? !allowed(r.version) : recorded && hit.version !== r.version)
+    if (r && behind)
+      outOfSync.push({
+        source: "node_modules",
+        version: r.version,
+        spec: d.spec,
+      })
+    if (r && !behind) {
       const flags: InstalledDep["flags"] = []
       if (r.name !== d.key) flags.push("alias")
       if (semver.prerelease(r.version)) flags.push("prerelease-installed")
-      return {
+      return withSkipped({
         id: r.realDir,
         name: r.name,
         version: r.version,
@@ -266,31 +362,34 @@ async function resolveDep(
         local: r.local,
         declaredBy: [],
         flags,
-      }
+      })
     }
   }
-  if (lock) {
-    const hit = lock.reader.lookup(relPath(lock.dir, m.dir), d.key, d.spec)
-    if (hit) {
-      const flags: InstalledDep["flags"] = []
-      if (hit.name !== d.key) flags.push("alias")
-      return {
-        id: `${lock.reader.source}:${hit.name}@${hit.version}`,
-        name: hit.name,
-        version: hit.version,
-        versionSource: lock.reader.source,
-        local: false,
-        declaredBy: [],
-        flags,
-      }
-    }
+  if (lock && hit && lockStale)
+    outOfSync.push({
+      source: lock.reader.source,
+      version: hit.version,
+      spec: d.spec,
+    })
+  if (lock && hit && !lockStale) {
+    const flags: InstalledDep["flags"] = []
+    if (hit.name !== d.key) flags.push("alias")
+    return withSkipped({
+      id: `${lock.reader.source}:${hit.name}@${hit.version}`,
+      name: hit.name,
+      version: hit.version,
+      versionSource: lock.reader.source,
+      local: false,
+      declaredBy: [],
+      flags,
+    })
   }
-  const range = d.specKind === "alias" ? d.spec.replace(/^npm:.*@/, "") : d.spec
+  const range = rangeOf(d)
   if (d.specKind === "range" || d.specKind === "alias") {
     const min = semver.validRange(range) ? semver.minVersion(range) : null
     if (min) {
       const name = d.aliasOf ?? d.key
-      return {
+      return withSkipped({
         id: `manifest-range:${name}@${min.version}`,
         name,
         version: min.version,
@@ -298,8 +397,27 @@ async function resolveDep(
         local: false,
         declaredBy: [],
         flags: ["range-guess", ...(d.aliasOf ? (["alias"] as const) : [])],
-      }
+      })
     }
   }
   return undefined
+}
+
+function rangeOf(d: DeclaredDep): string {
+  return d.specKind === "alias" ? d.spec.replace(/^npm:.*@/, "") : d.spec
+}
+
+// Whether a version is one the declaration allows. Only a range can say no: a tag, a catalog entry
+// or a bare alias names no version. A prerelease inside the range is allowed, as when a project
+// installs a release candidate of the version it declares.
+function allowedBy(d: DeclaredDep): (version: string) => boolean {
+  const range = rangeOf(d)
+  if (
+    (d.specKind !== "range" && d.specKind !== "alias") ||
+    !semver.validRange(range)
+  )
+    return () => true
+  return (version) =>
+    !semver.valid(version) ||
+    semver.satisfies(version, range, { includePrerelease: true })
 }

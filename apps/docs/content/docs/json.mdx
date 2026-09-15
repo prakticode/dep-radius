@@ -126,6 +126,7 @@ Each entry of `breakingWithoutApi` and `changesWithoutApi` has `version`, `title
 | `opaque-usage`            | review    | Used from scripts, config, CSS or side effects                   |
 | `not-referenced`          | review    | No scanned file uses it: a tool, loaded by name, or unused       |
 | `flagged-install`         | review    | Patched, not on the registry, or the version was guessed         |
+| `out-of-sync`             | review    | The lockfile or `node_modules` is out of date with `package.json` |
 | `surface-incomplete`      | review    | The types couldn't be fully compared                             |
 | `no-evidence`             | review    | Neither the notes nor the types are complete                     |
 | `major-unproven`          | review    | A major is only quiet when both nets are complete and clean      |

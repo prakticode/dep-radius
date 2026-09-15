@@ -21,6 +21,12 @@ For each dependency, it finds the installed version in this order:
    `bun.lock`.
 3. The lowest version the range allows. This is a guess, so radius flags it and never says quiet.
 
+A lockfile written for a different version than your `package.json` asks for is out of date, and so
+is a `node_modules` that doesn't match an up-to-date lockfile. That happens when a pull request bumps a
+version without updating the lockfile, or before you install again. radius skips the out-of-date
+source, reads the next one, says which version it skipped (`out-of-sync`), and never calls that
+update quiet.
+
 Your own workspace packages (`workspace:`, `link:`, `file:`) are skipped. Packages installed from git
 or a URL are listed as not analysed.
 

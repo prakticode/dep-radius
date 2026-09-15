@@ -76,6 +76,7 @@ export function buildPackageBrief(parts: BriefParts): PackageBrief {
     bump: candidate.bump,
     zeroMajor: zeroMajor && candidate.bump === "major",
     flags: dep.flags,
+    outOfSync: dep.outOfSync ?? [],
     usage,
     surface,
     notes,
