@@ -69,12 +69,12 @@ export interface FileFacts {
   prefixImports: { prefix: string; pos: Pos }[]
   stringLiterals: { value: string; pos: Pos }[]
   // the keys of object literals passed to the calls of a reference, by the reference's position:
-  // `bodyParser.json({ limit })` passes `limit`
-  passedKeys: { line: number; col: number; keys: string[] }[]
+  // `bodyParser.json({ limit })` passes `limit`; `at` holds where each key is written
+  passedKeys: { line: number; col: number; keys: string[]; at: Pos[] }[]
   unparseable: boolean
 }
 
-export const SCANNER_VERSION = 3
+export const SCANNER_VERSION = 4
 
 export function parseSource(src: SourceText): FileFacts {
   const facts: FileFacts = {
@@ -319,6 +319,15 @@ function parseBlock(
 
   // ---------------------------------------------------------------- pass 2: references and inline uses
   const derived = new Map<string, true>()
+  const recordPassed = (at: Pos, passed: Passed[]) => {
+    if (passed.length > 0)
+      facts.passedKeys.push({
+        line: at.line,
+        col: at.col,
+        keys: passed.map((p) => p.name),
+        at: passed.map((p) => pos(p.node)),
+      })
+  }
   const visit = (node: ts.Node): void => {
     if (
       ts.isIdentifier(node) &&
@@ -329,8 +338,7 @@ function parseBlock(
       const at = pos(node)
       const { passed, ...rest } = withoutBenign(ref)
       facts.references.push({ local: node.text, ...rest, pos: at })
-      if (passed.length > 0)
-        facts.passedKeys.push({ line: at.line, col: at.col, keys: passed })
+      recordPassed(at, passed)
       if (ref.derivedInto) derived.set(ref.derivedInto, true)
       for (const cb of ref.callbackInto ?? []) derived.set(cb, true)
     } else if (ts.isCallExpression(node)) {
@@ -379,10 +387,7 @@ function parseBlock(
     while (ts.isParenthesizedExpression(cur.parent)) cur = cur.parent
     const r = climbFrom(cur)
     const binding: Binding = isImport ? { kind: "namespace" } : { kind: "cjs" }
-    if (r.passed.length > 0) {
-      const at = pos(node)
-      facts.passedKeys.push({ line: at.line, col: at.col, keys: r.passed })
-    }
+    recordPassed(pos(node), r.passed)
     const parent = cur.parent
     if (
       r.chain.length === 0 &&
@@ -437,14 +442,7 @@ function parseBlock(
       ) {
         const r = climbFrom(node)
         if (r.chain.length > 0 || r.callSelf) {
-          if (r.passed.length > 0) {
-            const at = pos(node)
-            facts.passedKeys.push({
-              line: at.line,
-              col: at.col,
-              keys: r.passed,
-            })
-          }
+          recordPassed(pos(node), r.passed)
           facts.references.push({
             local: node.text,
             chain: r.chain,
@@ -476,7 +474,13 @@ interface Climb {
   callbackInto?: string[]
   // bare use that does not hide which member is used: JSX tag, class heritage, typeof import, export specifier
   benign: boolean
-  passed: string[]
+  passed: Passed[]
+}
+
+// a key of an object literal passed to a call, and where it is written
+interface Passed {
+  name: string
+  node: ts.Node
 }
 
 function climbFrom(start: ts.Node): Climb {
@@ -486,7 +490,7 @@ function climbFrom(start: ts.Node): Climb {
   let computed = false
   let benign = false
   const callbacks: string[] = []
-  const passed = new Set<string>()
+  const passed = new Map<string, ts.Node>()
   let cur: ts.Node = start
   for (;;) {
     const p: ts.Node = cur.parent
@@ -525,7 +529,7 @@ function climbFrom(start: ts.Node): Climb {
         if (ts.isObjectLiteralExpression(arg))
           for (const prop of arg.properties) {
             const name = prop.name && propertyName(prop.name)
-            if (name) passed.add(name)
+            if (name && !passed.has(name)) passed.set(name, prop)
           }
       }
       const last = chain[chain.length - 1]
@@ -593,7 +597,7 @@ function climbFrom(start: ts.Node): Climb {
     typeOnly,
     computed,
     benign,
-    passed: [...passed],
+    passed: [...passed].map(([name, node]) => ({ name, node })),
     ...(derivedInto ? { derivedInto } : {}),
     ...(callbacks.length > 0 ? { callbackInto: [...new Set(callbacks)] } : {}),
   }
