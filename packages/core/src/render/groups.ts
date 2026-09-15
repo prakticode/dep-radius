@@ -90,13 +90,15 @@ export function likelyLabel(
 export function orderFindings(p: PackageBrief): Finding[] {
   const rank = (f: Finding): number => {
     if (f.kind === "type") {
-      if (f.touched.strength === "weak") return 3
+      if (f.touched.strength === "weak") return 5
       return f.touched.bucket === "removed" ? 0 : 1
     }
-    if (f.kind === "breaking-no-api") return 2
-    if (f.kind === "change-no-api") return 3
+    if (f.kind === "breaking-no-api") return 4
+    if (f.kind === "change-no-api") return 5
+    // a note its author marks breaking, naming something you use even only by name, comes before
+    // the ordinary fixes that name it exactly: a long upgrade has dozens of those
     if (f.match.entry.breakingMarker) return f.match.direct ? 0 : 2
-    return f.match.direct ? 1 : 3
+    return f.match.direct ? 3 : 5
   }
   const all: Finding[] = [
     ...p.surface.touched.map((touched) => ({ kind: "type" as const, touched })),

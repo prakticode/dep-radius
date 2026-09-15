@@ -110,10 +110,11 @@ export function joinRecords(
     else if (kind === "change" && (namesApi === "none" || !use.typesRead))
       unattributedChanges.push(e)
   }
+  // breaking first, then exact: the order an agent reading the JSON meets them in
   matched.sort(
     (a, b) =>
-      Number(b.direct) - Number(a.direct) ||
-      Number(b.entry.breakingMarker) - Number(a.entry.breakingMarker)
+      Number(b.entry.breakingMarker) - Number(a.entry.breakingMarker) ||
+      Number(b.direct) - Number(a.direct)
   )
   return {
     matched,
