@@ -1,6 +1,6 @@
 {
   "name": "dep-radius",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Tells your AI agent which changes in a dependency upgrade affect your code, with the files and lines to check.",
   "license": "MIT",
   "author": "prakticode",

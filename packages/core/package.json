@@ -1,6 +1,6 @@
 {
   "name": "@dep-radius/core",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "The library behind dep-radius: which changes in a dependency upgrade affect your code, and on which lines.",
   "license": "MIT",
   "author": "prakticode",

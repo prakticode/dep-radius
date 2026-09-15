@@ -1,5 +1,17 @@
 # @dep-radius/core
 
+## 0.4.4
+
+### Patch Changes
+
+- 36a2123: A release note about an option now lands on the line that writes the option as well as on
+  the call that passes it, so `ssl: true` inside a `new Pool({ ... })` spread over several lines is
+  shown on its own line.
+- 52229bd: radius now follows values declared with a package's type, such as `ctx` in
+  `function load(ctx: Context) { ctx.store.list({ limit }) }`: the reads and the options passed on
+  them count as usage, so a note about `limit` lands on that call and on the line of the option
+  instead of leaving the upgrade quiet.
+
 ## 0.4.3
 
 ### Patch Changes
