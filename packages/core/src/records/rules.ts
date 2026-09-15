@@ -132,6 +132,32 @@ function titleNamesAnotherApi(e: NoteEntry, scope: string): boolean {
   )
 }
 
+// "excess arguments cause an error, see migration tips": the one-line entry names nothing, the
+// release's "Migration Tips" section below it holds the names. Only a section of the same release
+// with a body, named in the entry's own words after "see".
+function pointedSections(e: NoteEntry, live: NoteEntry[]): NoteEntry[] {
+  const words = plainWords(
+    e.regions
+      .filter((r) => r.kind === "title" || r.kind === "prose")
+      .map((r) => r.text)
+      .join(" ")
+  )
+  if (!/\bsee\b/.test(words)) return []
+  return live.filter((s) => {
+    if (s === e || s.version !== e.version) return false
+    if (!s.regions.some((r) => r.kind !== "title")) return false
+    const title = plainWords(s.title)
+    return (
+      title.length >= 4 &&
+      new RegExp(`\\bsee\\s+(?:the\\s+)?${escape(title)}(?![\\w-])`).test(words)
+    )
+  })
+}
+
+function plainWords(s: string): string {
+  return s.replace(/[`*_]/g, "").replace(/\s+/g, " ").trim().toLowerCase()
+}
+
 function camelCase(header: string): string {
   return header
     .toLowerCase()
@@ -187,10 +213,18 @@ export function rulesRecords(
       titleScope && !titleNamesAnotherApi(e, titleScope)
         ? titleScope
         : undefined
+    // what the entry says, with the sections of its release it sends the reader to
+    const read: NoteEntry = {
+      ...e,
+      regions: [
+        ...e.regions,
+        ...pointedSections(e, live).flatMap((s) => s.regions),
+      ],
+    }
     const mentions: Mention[] = []
     for (const n of names) {
       const regions: RegionKind[] = []
-      for (const r of e.regions)
+      for (const r of read.regions)
         if (
           !regions.includes(r.kind) &&
           (n.re.test(r.text) ||
@@ -207,7 +241,7 @@ export function rulesRecords(
       })
     }
     for (const name of new Set(vocabulary.options)) {
-      const region = optionHit(name, e)
+      const region = optionHit(name, read)
       if (region) mentions.push({ name, regions: [region], option: true })
     }
     return {

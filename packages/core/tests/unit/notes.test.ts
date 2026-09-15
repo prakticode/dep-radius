@@ -528,6 +528,50 @@ describe("prereleasesIn", () => {
   })
 })
 
+describe("entries that point to a section of their release", () => {
+  const body = [
+    "### Changed",
+    "",
+    "- *Breaking*: excess arguments cause an error by default, see migration tips (#2223)",
+    "- *Breaking*: drop Node 18",
+    "",
+    "### Migration Tips",
+    "",
+    "It is now an error to pass more arguments than declared. (`allowExcess` is now false by default.)",
+    "",
+    "```js",
+    "program.action(() => {",
+    "  console.log(program.args)",
+    "})",
+    "```",
+  ].join("\n")
+
+  it("reads an entry with the section it sends the reader to", () => {
+    const m = matchNotes(splitEntries("13.0.0", body), ["args"], [])
+    const pointer = m.matched.find((x) => x.entry.breakingMarker)
+    expect(pointer?.entry.title).toBe(
+      "*Breaking*: excess arguments cause an error by default, see migration tips (#2223)"
+    )
+    expect(pointer?.hits).toEqual([
+      { name: "args", strength: "strong", region: "code-block" },
+    ])
+    expect(pointer?.direct).toBe(false)
+    expect(m.unattributedBreaking.map((e) => e.title)).toEqual([
+      "*Breaking*: drop Node 18",
+    ])
+  })
+
+  it("never reads a section of another release, or one the entry does not name", () => {
+    const other = splitEntries("12.0.0", body.split("### Migration Tips")[0]!)
+    const tips = splitEntries(
+      "13.0.0",
+      "### Migration Tips" + body.split("### Migration Tips")[1]!
+    )
+    const m = matchNotes([...other, ...tips], ["args"], [])
+    expect(m.matched.map((x) => x.entry.title)).toEqual(["Migration Tips"])
+  })
+})
+
 describe("demotion and breaking entries", () => {
   it("never silences a breaking entry, even when its only link is example code", () => {
     const many = splitEntries(

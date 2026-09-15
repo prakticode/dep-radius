@@ -36,6 +36,16 @@ export interface Store { list(query?: { type?: string; ${count}?: number; toStri
 export interface Context { store: Store }
 `
 
+const programTypes = `
+export declare class Command {
+  args: string[]
+  constructor(name?: string)
+  command(name: string): Command
+  action(fn: (...args: any[]) => void): this
+  allowExcessArguments(allow?: boolean): this
+}
+`
+
 function version(
   name: string,
   v: string,
@@ -145,6 +155,35 @@ const packages: FakePackage[] = [
     },
   },
   {
+    // a default changes on the class the project receives injected, told in the release's tips
+    name: "acme-program",
+    repository: "git+https://github.com/acme/program.git",
+    versions: [
+      version("acme-program", "1.0.0", OLD, programTypes),
+      version("acme-program", "1.1.0", NEWISH, programTypes),
+    ],
+    releases: {
+      "v1.1.0": [
+        "### Changed",
+        "",
+        "- *Breaking*: excess command-arguments cause an error by default, see migration tips (#2223)",
+        "",
+        "### Migration Tips",
+        "",
+        "**Excess command-arguments**",
+        "",
+        "It is now an error for the user to specify more command-arguments than are expected. (`allowExcessArguments` is now false by default.)",
+        "",
+        "```js",
+        "program.action((options) => {",
+        "  console.log(program.args);",
+        "});",
+        "```",
+        "",
+      ].join("\n"),
+    },
+  },
+  {
     // no types, no notes anywhere: invisible, so never quiet
     name: "acme-dark",
     versions: [
@@ -210,6 +249,7 @@ describe("run, end to end against a fake registry", () => {
       installed("acme-notes", "2.0.0", schemaTypes()),
       installed("acme-member", "3.0.0", schemaTypes()),
       installed("acme-typed", "1.0.0", typedTypes("limit")),
+      installed("acme-program", "1.0.0", programTypes),
       installed("acme-dark", "1.0.0"),
       installed("acme-cli", "1.0.0", undefined, { bin: { acme: "cli.js" } }),
     ]
@@ -230,6 +270,7 @@ describe("run, end to end against a fake registry", () => {
             "acme-notes": "^2.0.0",
             "acme-member": "^3.0.0",
             "acme-typed": "^1.0.0",
+            "acme-program": "^1.0.0",
             "acme-dark": "^1.0.0",
             "acme-cli": "^1.0.0",
           },
@@ -241,6 +282,7 @@ describe("run, end to end against a fake registry", () => {
         "packages/app/src/schema.ts": `import { object } from "acme-member"\n\nexport const user = object({})\n`,
         "packages/app/src/member.ts": `import { user } from "./schema"\n\nexport function check(x: unknown) {\n  return user.parse(x)\n}\n`,
         "packages/app/src/typed.ts": `import type { Context } from "acme-typed"\n\nexport function load(ctx: Context) {\n  return ctx.store.list({\n    type: "x",\n    limit: 5,\n  })\n}\n`,
+        "packages/app/src/cli.ts": `import { Command } from "acme-program"\n\nexport class Cli {\n  constructor(private readonly program: Command) {}\n\n  init() {\n    this.program.command("generate").action((_, cmd) => this.pass(cmd))\n  }\n\n  pass = (cmd: Command) => cmd.args\n}\n`,
         "packages/app/src/dark.js": `const dark = require("acme-dark")\n\ndark.shade()\n`,
         ...Object.assign({}, ...inst.map((i) => i.files)),
       },
@@ -311,6 +353,23 @@ describe("run, end to end against a fake registry", () => {
     expect(p.usage.byName.limit?.map((s) => `${s.file}:${s.line}`)).toEqual([
       "packages/app/src/typed.ts:4",
       "packages/app/src/typed.ts:6",
+    ])
+  })
+
+  it("ties a break told in the release's tips to the reads of an injected value of the package's type", () => {
+    const p = byName("acme-program")
+    expect(p.verdict).toBe("review")
+    expect(p.usage.strongNames).toEqual(
+      expect.arrayContaining(["args", "command"])
+    )
+    const excess = p.notes.matched.find((m) =>
+      m.entry.title.includes("excess command-arguments")
+    )
+    expect(excess?.entry.breakingMarker).toBe(true)
+    expect(excess?.hits.map((h) => h.name)).toEqual(["args"])
+    expect(p.notes.unattributedBreaking).toEqual([])
+    expect(p.usage.byName.args?.map((s) => `${s.file}:${s.line}`)).toEqual([
+      "packages/app/src/cli.ts:10",
     ])
   })
 
