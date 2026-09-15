@@ -1,5 +1,23 @@
 # @dep-radius/core
 
+## 0.4.10
+
+### Patch Changes
+
+- 72e5aee: A release note that names a package in a code span, such as "[breaking] `linkify-it` =>
+  v6", now ties to the member of your code named after it, such as `md.linkify`, as a possible
+  match. Before, markdown-it 15's change to linkify defaults was listed as a change radius could not
+  tie to your code.
+- 5ad9745: A breaking note that sends the reader to a section of its release, such as "excess
+  arguments cause an error by default, see migration tips", is now read with that section, so the
+  names in its examples tie the note to your code. Reads on a value declared with a package's type,
+  such as `cmd.args` in `(cmd: Command) => cmd.args`, now count as exact, like reads on the import.
+- 10e4d57: A breaking release note that names no API but says what went, such as "Remove Deprecated
+  Legacy Namespace Support", is now shown at the lines of the removed exports your code uses, when
+  the type definitions confirm it: the old version exported a namespace that the new one no longer
+  does, or marked the removed exports as deprecated. Before, the note was listed apart as a break
+  that could apply to anyone, next to removed exports it explained.
+
 ## 0.4.9
 
 ### Patch Changes
