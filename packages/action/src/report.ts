@@ -49,6 +49,24 @@ export function planComment(
   return verdict === "none" ? { kind: "skip" } : { kind: "create" }
 }
 
+export const REPO_URL = "https://github.com/prakticode/dep-radius"
+export const SETUP_URL = "https://depradius.com/docs/github-action"
+
+// One line under the brief, for a reviewer who has never heard of radius: what it is, and where to
+// get it. The comment is edited on every push, so it says so; a job summary belongs to one run.
+export function footer(version: string, { live }: { live: boolean }): string {
+  const parts = [
+    `[dep-radius](${REPO_URL}) ${version} matches release notes to the lines they affect`,
+    `[Add it to your repo](${SETUP_URL})`,
+  ]
+  if (live) parts.push("updated on every push")
+  return `<sub>${parts.join(" · ")}</sub>`
+}
+
 export function commentBody(markdown: string, version: string): string {
-  return `${MARKER}\n${markdown.trimEnd()}\n\n<sub>[dep-radius](https://github.com/prakticode/dep-radius) ${version}, updated on every push</sub>\n`
+  return `${MARKER}\n${markdown.trimEnd()}\n\n${footer(version, { live: true })}\n`
+}
+
+export function summaryBody(markdown: string, version: string): string {
+  return `${markdown.trimEnd()}\n\n${footer(version, { live: false })}\n`
 }
