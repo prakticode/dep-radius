@@ -1,5 +1,16 @@
 # dep-radius
 
+## 0.4.5
+
+### Patch Changes
+
+- e95ec13: A release note marked breaking that names something your code uses is now listed before
+  the ordinary fixes that name it exactly, in the terminal, the pull request comment and `--json`.
+  On a long upgrade such as mongoose 7 to 9, dozens of exact fixes no longer push the breaking note
+  out of the default output.
+- Updated dependencies [e95ec13]
+  - @dep-radius/core@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes
