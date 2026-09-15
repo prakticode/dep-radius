@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs"
 
 import { createCtx, type Options, run, toolVersion } from "@dep-radius/core"
 
+import type { SplitName } from "./labels.ts"
 import { Repo, VERSION_FILE } from "./git.ts"
 import { readJson, writeJson } from "./store.ts"
 import { BudgetError, type GitHub } from "./github.ts"
@@ -14,13 +15,20 @@ export interface EvaluateOptions {
   limit: number
   concurrency: number
   force: boolean
+  // evaluate every case, not only those `check` supports
+  all: boolean
   // radius's own cache: packuments, tarballs and notes are shared with every other radius run
   radiusCache: string
   log: (line: string) => void
 }
 
-export function resultsDir(data: string): string {
-  return join(data, "results")
+// A locked case's results and brief live apart, so reading the working ones never shows them.
+export function setDir(data: string, split: SplitName): string {
+  return split === "locked" ? join(data, "locked") : data
+}
+
+export function resultsDir(data: string, split: SplitName = "working"): string {
+  return join(setDir(data, split), "results")
 }
 
 export function snapshotDir(data: string, id: string): string {
@@ -81,7 +89,7 @@ async function evaluateCase(
       color: false,
     }
     const brief = await run(opts, createCtx(opts))
-    writeJson(join(o.data, "briefs", `${c.id}.json`), brief)
+    writeJson(join(setDir(o.data, c.split), "briefs", `${c.id}.json`), brief)
     result.packages = c.packages.map((p) => scorePackage(c, p, brief))
     // notes missing for want of budget would read as a real miss: the case is run again later
     const limited = brief.packages.some((p) =>
@@ -94,8 +102,11 @@ async function evaluateCase(
   return result
 }
 
-export function loadResults(data: string): CaseResult[] {
-  const dir = resultsDir(data)
+export function loadResults(
+  data: string,
+  split: SplitName = "working"
+): CaseResult[] {
+  const dir = resultsDir(data, split)
   if (!existsSync(dir)) return []
   return readdirSync(dir)
     .filter((f) => f.endsWith(".json"))
@@ -104,22 +115,60 @@ export function loadResults(data: string): CaseResult[] {
     .filter(Boolean)
 }
 
+// The cases a score counts: supported by `check` unless `all`, and still in `cases/`.
+export function counted(cases: CaseManifest[], all: boolean): CaseManifest[] {
+  return cases.filter((c) => all || c.labels.check === "supported")
+}
+
+export interface SetSummary {
+  totals: Totals
+  // the same, for the cases whose fix is in tests only, and for the others
+  testsOnly: Totals
+  source: Totals
+}
+
 export interface EvaluateSummary {
   evaluated: number
   skipped: number
+  // cases left out: not checked yet, or weak, reformat or error
+  excluded: Record<string, number>
   stopped?: string
-  totals: Totals
+  working: SetSummary
+  locked: SetSummary
+  // per case, working set only
   results: CaseResult[]
+  cases: CaseManifest[]
+}
+
+function summarise(results: CaseResult[], cases: CaseManifest[]): SetSummary {
+  const tests = new Set(
+    cases.filter((c) => c.labels.testsOnly).map((c) => c.id)
+  )
+  return {
+    totals: totals(results),
+    testsOnly: totals(results.filter((r) => tests.has(r.id))),
+    source: totals(results.filter((r) => !tests.has(r.id))),
+  }
 }
 
 export async function evaluate(
   gh: GitHub,
   o: EvaluateOptions
 ): Promise<EvaluateSummary> {
+  const all = loadCases(o.data)
+  const chosen = counted(all, o.all)
+  const excluded: Record<string, number> = {}
+  for (const c of all)
+    if (!chosen.includes(c)) {
+      const k = c.labels.check ?? "not checked"
+      excluded[k] = (excluded[k] ?? 0) + 1
+    }
   const pending: CaseManifest[] = []
   let skipped = 0
-  for (const c of loadCases(o.data)) {
-    const done = readJson<CaseResult>(join(resultsDir(o.data), `${c.id}.json`))
+  for (const c of chosen) {
+    const done = readJson<CaseResult>(
+      join(resultsDir(o.data, c.split), `${c.id}.json`)
+    )
     if (done && !done.error && !o.force) {
       skipped++
       continue
@@ -141,10 +190,18 @@ export async function evaluate(
         stopped = e.message
         return
       }
-      o.log(`${c.id}: evaluating ${c.packages.length} upgrades`)
+      o.log(
+        c.split === "locked"
+          ? `${c.id}: evaluating (locked)`
+          : `${c.id}: evaluating ${c.packages.length} upgrades`
+      )
       const r = await evaluateCase(o, c)
-      writeJson(join(resultsDir(o.data), `${c.id}.json`), r)
+      writeJson(join(resultsDir(o.data, c.split), `${c.id}.json`), r)
       evaluated++
+      if (c.split === "locked") {
+        o.log(`${c.id}: ${r.error ? "error" : "done"} (locked)`)
+        continue
+      }
       o.log(
         r.error
           ? `${c.id}: error: ${r.error.slice(0, 200)}`
@@ -162,21 +219,64 @@ export async function evaluate(
     Array.from({ length: Math.max(1, o.concurrency) }, () => worker())
   )
 
-  const results = loadResults(o.data)
-  const sum = totals(results)
-  writeJson(join(o.data, "report.json"), {
-    generatedAt: new Date().toISOString(),
-    radius: toolVersion(),
-    totals: sum,
-    results,
-  })
-  return {
+  const ids = (split: SplitName) =>
+    new Set(chosen.filter((c) => c.split === split).map((c) => c.id))
+  const working = ids("working")
+  const locked = ids("locked")
+  const workingResults = loadResults(o.data, "working").filter((r) =>
+    working.has(r.id)
+  )
+  const lockedResults = loadResults(o.data, "locked").filter((r) =>
+    locked.has(r.id)
+  )
+  const summary: EvaluateSummary = {
     evaluated,
     skipped,
+    excluded,
     ...(stopped ? { stopped } : {}),
-    totals: sum,
-    results,
+    working: summarise(workingResults, chosen),
+    locked: summarise(lockedResults, chosen),
+    results: workingResults,
+    cases: chosen.filter((c) => c.split === "working"),
   }
+  const generatedAt = new Date().toISOString()
+  writeJson(join(o.data, "report.json"), {
+    generatedAt,
+    radius: toolVersion(),
+    working: summary.working,
+    locked: summary.locked,
+    results: workingResults,
+  })
+  writeJson(join(o.data, "locked", "report.json"), {
+    generatedAt,
+    radius: toolVersion(),
+    locked: summary.locked,
+    results: lockedResults,
+  })
+  return summary
+}
+
+const pct = (a: number, b: number) =>
+  b ? `${Math.round((a / b) * 100)}%` : "-"
+
+// The five numbers of a set, on one row each: what the README defines.
+export function renderNumbers(label: string, t: Totals): string[] {
+  return [
+    `${label}: ${t.cases} cases (${t.errors} errors, ${t.scoredCases} scored)`,
+    `  found at the line   ${pct(t.foundCases, t.scoredCases)} (${t.foundCases} of ${t.scoredCases} cases)`,
+    `  wrong quiet         ${pct(t.wrongQuietCases, t.scoredCases)} (${t.wrongQuietCases} of ${t.scoredCases} cases)`,
+    `  median cannot tie   ${t.medianCannotTie} notes`,
+    `  precision           ${pct(t.reportedHits, t.reportedLines)} of lines (${t.reportedHits} of ${t.reportedLines}), ${pct(t.matchedNotesHit, t.matchedNotes)} of matched notes (${t.matchedNotesHit} of ${t.matchedNotes})`,
+    `  quiet rate          ${pct(t.quietPackages, t.analysedPackages)} (${t.quietPackages} of ${t.analysedPackages} analysed packages)`,
+  ]
+}
+
+function renderSet(label: string, s: SetSummary): string[] {
+  return [
+    ...renderNumbers(label, s.totals),
+    ...renderNumbers(`${label}, fix in source`, s.source),
+    ...renderNumbers(`${label}, fix in tests only`, s.testsOnly),
+  ]
 }
 
 export function renderSummary(s: EvaluateSummary): string {
@@ -210,16 +310,19 @@ export function renderSummary(s: EvaluateSummary): string {
       .map((c, i) => c.slice(0, widths[i]).padEnd(widths[i]!))
       .join("  ")
       .trimEnd()
-  const t = s.totals
-  const pct = (a: number, b: number) =>
-    b ? `${Math.round((a / b) * 100)}%` : "-"
+  const excluded = Object.entries(s.excluded)
+    .map(([k, n]) => `${n} ${k}`)
+    .join(", ")
   return [
+    "working set, per case:",
     line(head),
     ...rows.map(line),
     "",
-    `cases ${t.cases} (${t.errors} errors, ${t.scoredCases} with expected lines)`,
-    `found ${t.foundCases} of ${t.scoredCases} cases (${pct(t.foundCases, t.scoredCases)}), ${t.foundPackages} of ${t.packages} packages (${pct(t.foundPackages, t.packages)})`,
-    `wrong quiet ${t.wrongQuietCases} cases, ${t.wrongQuietPackages} packages; not analysed ${t.notAnalysedPackages} packages`,
-    `median list length ${t.medianCannotTie} notes radius cannot tie, median matched notes ${t.medianMatchedNotes}`,
+    ...renderSet("working", s.working),
+    "",
+    // never per case: the locked set only ever gives totals
+    ...renderSet("locked", s.locked),
+    "",
+    `left out: ${excluded || "none"}`,
   ].join("\n")
 }

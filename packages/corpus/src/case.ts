@@ -2,6 +2,7 @@ import { join } from "node:path"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 
 import { writeJson } from "./store.ts"
+import type { Bump, SplitName } from "./labels.ts"
 
 export interface Upgrade {
   name: string
@@ -46,6 +47,27 @@ export interface CaseManifest {
   // the lines the fix wrote in the same files, for `check`
   added: { file: string; line: number; text: string }[]
   minedAt: string
+  // `working` cases are read while improving radius; `locked` ones only ever give totals
+  split: SplitName
+  labels: CaseLabels
+}
+
+export type TypesSource = "bundled" | "@types" | "none" | "unknown"
+
+export type CheckResult = "supported" | "weak" | "reformat" | "error"
+
+export interface CaseLabels {
+  // the largest step among the upgrades
+  bump: Bump
+  // every expected line is in a test file: the upgrade broke tests, not the product
+  testsOnly: boolean
+  // share of the fix's removed source lines that only changed layout, and of the expected lines
+  reformatShare: number
+  expectedReformatShare: number
+  // where each upgraded package's types come from, filled by `check`
+  types?: Record<string, TypesSource>
+  // filled by `check`
+  check?: CheckResult
 }
 
 export function caseId(repo: string, pr: number): string {
