@@ -17,6 +17,9 @@ export function bunLock(text: string): LockReader | undefined {
   return {
     source: "lockfile:bun",
     lookup(dir, key) {
+      // bun lists every workspace; a nested manifest it does not list is installed on its own
+      const workspaces = config.workspaces
+      if (workspaces && dir !== "." && !(dir in workspaces)) return undefined
       const entry = packages[key]
       const ident = Array.isArray(entry) ? entry[0] : undefined
       if (typeof ident !== "string") return undefined

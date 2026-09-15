@@ -40,6 +40,19 @@ export function npmLock(text: string): LockReader | undefined {
         declared.length === 0
           ? undefined
           : (declared.find((d) => key in d)?.[key] ?? null)
+      // A lockfile that records what its root declared records every workspace too. A nested
+      // manifest it has no entry for is not part of this install (a `functions/` folder deployed on
+      // its own), so the versions hoisted here are not the ones it gets.
+      const root = packages[""]
+      const recordsImporters =
+        !!root &&
+        [
+          root.dependencies,
+          root.devDependencies,
+          root.optionalDependencies,
+          root.peerDependencies,
+        ].some((d) => d !== undefined)
+      if (manifestDir !== "." && !importer && recordsImporters) return undefined
       let dir = manifestDir === "." ? "" : manifestDir
       for (;;) {
         const k = dir ? `${dir}/node_modules/${key}` : `node_modules/${key}`

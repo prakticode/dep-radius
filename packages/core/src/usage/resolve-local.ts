@@ -7,7 +7,11 @@ import ts from "typescript"
 import { relPath } from "../inventory/manifests.ts"
 import type { InstalledDep, Inventory } from "../model.ts"
 import { packageNameOf, subpathOf } from "../inventory/specifiers.ts"
-import { projectBoundary, resolveInstalled } from "../inventory/installed.ts"
+import {
+  lockDirFor,
+  projectBoundary,
+  resolveInstalled,
+} from "../inventory/installed.ts"
 
 export type Target =
   | { kind: "file"; rel: string }
@@ -99,7 +103,12 @@ export class LocalResolver {
     const key = `${fromDir}\0${pkg}`
     let p = this.installCache.get(key)
     if (!p) {
-      p = resolveInstalled(fromDir, pkg, this.boundary)
+      // as the inventory does: never past the folder of a separate install's lockfile
+      p = resolveInstalled(
+        fromDir,
+        pkg,
+        lockDirFor(fromDir, this.boundary) ?? this.boundary
+      )
       this.installCache.set(key, p)
     }
     const found = await p

@@ -325,6 +325,152 @@ describe("run --since, when the change bumps a pin and leaves the lockfile behin
   })
 })
 
+describe("run --since, with a folder installed separately", () => {
+  let root: string
+  let cleanup: () => void
+  let brief: Brief
+
+  const npmLock = (deps: Record<string, [string, string]>) =>
+    `${JSON.stringify(
+      {
+        lockfileVersion: 3,
+        packages: {
+          "": {
+            dependencies: Object.fromEntries(
+              Object.entries(deps).map(([n, [spec]]) => [n, spec])
+            ),
+          },
+          ...Object.fromEntries(
+            Object.entries(deps).map(([n, [, v]]) => [
+              `node_modules/${n}`,
+              { version: v },
+            ])
+          ),
+        },
+      },
+      null,
+      2
+    )}\n`
+
+  beforeAll(async () => {
+    const project = createProject({
+      files: {
+        "package.json": pkgJson({
+          name: "app",
+          private: true,
+          dependencies: { "acme-lib": "^1.0.0" },
+        }),
+        "package-lock.json": npmLock({ "acme-lib": ["^1.0.0", "1.0.0"] }),
+        "src/index.ts": `import { object } from "acme-lib"\n\nobject({})\n`,
+        // deployed on its own, pinned to the old version by its own lockfile
+        "functions/package.json": pkgJson({
+          name: "functions",
+          private: true,
+          dependencies: { "acme-lib": "1.0.0" },
+        }),
+        "functions/package-lock.json": npmLock({
+          "acme-lib": ["1.0.0", "1.0.0"],
+        }),
+        "functions/index.ts": `import { legacy } from "acme-lib"\n\nlegacy()\n`,
+      },
+    })
+    root = project.root
+    cleanup = project.cleanup
+    rmSync(join(root, ".git"), { recursive: true })
+    git(root, "init", "-q", "-b", "main")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "base")
+    // the bot bumps the root only
+    writeFileSync(
+      join(root, "package.json"),
+      pkgJson({
+        name: "app",
+        private: true,
+        dependencies: { "acme-lib": "^1.1.0" },
+      })
+    )
+    writeFileSync(
+      join(root, "package-lock.json"),
+      npmLock({ "acme-lib": ["^1.1.0", "1.1.0"] })
+    )
+
+    const opts = testOptions(root, { since: "main" })
+    brief = await run(opts, testCtx(opts, new FakeRegistry(packages)))
+  })
+
+  afterAll(() => cleanup())
+
+  it("reports the root's upgrade on the root's code only", () => {
+    expect(
+      brief.packages.map((p) => [p.pkg, p.from, p.to, p.manifests])
+    ).toEqual([["acme-lib", "1.0.0", "1.1.0", ["package.json"]]])
+    const files = brief.packages[0]!.usage.sites.map((s) => s.file)
+    expect(files).toContain("src/index.ts")
+    expect(files).not.toContain("functions/index.ts")
+    // functions still calls legacy(), removed in 1.1.0, but it does not get 1.1.0
+    expect(brief.packages[0]!.verdict).not.toBe("blocked")
+  })
+})
+
+describe("run --since, with two separate installs of the same package", () => {
+  let root: string
+  let cleanup: () => void
+
+  const pnpmLock = (spec: string, version: string) =>
+    `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      acme-lib:\n        specifier: ${spec}\n        version: ${version}\n`
+
+  beforeAll(() => {
+    const project = createProject({
+      files: {
+        "backend/package.json": pkgJson({
+          name: "backend",
+          private: true,
+          dependencies: { "acme-lib": "^1.0.0" },
+        }),
+        "backend/pnpm-lock.yaml": pnpmLock("^1.0.0", "1.0.0"),
+        "backend/index.ts": `import { legacy } from "acme-lib"\n\nlegacy()\n`,
+        // already on the new version before the change
+        "tools/package.json": pkgJson({
+          name: "tools",
+          private: true,
+          dependencies: { "acme-lib": "^1.1.0" },
+        }),
+        "tools/pnpm-lock.yaml": pnpmLock("^1.1.0", "1.1.0"),
+        "tools/index.ts": `import { object } from "acme-lib"\n\nobject({})\n`,
+      },
+    })
+    root = project.root
+    cleanup = project.cleanup
+    rmSync(join(root, ".git"), { recursive: true })
+    git(root, "init", "-q", "-b", "main")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "base")
+    writeFileSync(
+      join(root, "backend/package.json"),
+      pkgJson({
+        name: "backend",
+        private: true,
+        dependencies: { "acme-lib": "^1.1.0" },
+      })
+    )
+    writeFileSync(
+      join(root, "backend/pnpm-lock.yaml"),
+      pnpmLock("^1.1.0", "1.1.0")
+    )
+  })
+
+  afterAll(() => cleanup())
+
+  it("sees the install that moved, even when another one already had that version", async () => {
+    const opts = testOptions(root, { since: "main" })
+    const brief = await run(opts, testCtx(opts, new FakeRegistry(packages)))
+    expect(
+      brief.packages.map((p) => [p.pkg, p.from, p.to, p.manifests])
+    ).toEqual([["acme-lib", "1.0.0", "1.1.0", ["backend/package.json"]]])
+    expect(brief.packages[0]!.verdict).toBe("blocked")
+  })
+})
+
 describe("planSince", () => {
   const dep = (name: string, version: string, manifest = "package.json") => ({
     id: `lockfile:npm:${name}@${version}`,

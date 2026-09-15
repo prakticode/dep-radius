@@ -277,6 +277,65 @@ describe("buildInventory", () => {
     expect(unrecordedInv.installed[0]?.outOfSync).toBeUndefined()
   })
 
+  it("reads a folder with its own lockfile as a separate install, not from the root's", async () => {
+    const root = project({
+      "package.json": pkgJson({ dependencies: { a: "^2.0.0" } }),
+      "package-lock.json": JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          "": { dependencies: { a: "^2.0.0" } },
+          "node_modules/a": { version: "2.1.0" },
+        },
+      }),
+      "node_modules/a/package.json": pkgJson({ name: "a", version: "2.1.0" }),
+      "functions/package.json": pkgJson({ dependencies: { a: "^1.0.0" } }),
+      "functions/package-lock.json": JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          "": { dependencies: { a: "^1.0.0" } },
+          "node_modules/a": { version: "1.4.0" },
+        },
+      }),
+    })
+    const inv = await buildInventory(root, { prod: false })
+    expect(
+      inv.installed.map((d) => [
+        d.version,
+        d.versionSource,
+        d.declaredBy.map((b) => b.manifest),
+      ])
+    ).toEqual([
+      ["1.4.0", "lockfile:npm", ["functions/package.json"]],
+      ["2.1.0", "node_modules", ["package.json"]],
+    ])
+  })
+
+  it("does not read a nested manifest the root lockfile has no entry for", async () => {
+    const root = project({
+      "package.json": pkgJson({ dependencies: { a: "^2.0.0" } }),
+      "package-lock.json": JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          "": { dependencies: { a: "^2.0.0" } },
+          "node_modules/a": { version: "2.1.0" },
+        },
+      }),
+      // deployed on its own, without a lockfile: the root's hoisted 2.1.0 is not what it gets
+      "functions/package.json": pkgJson({ dependencies: { a: "^1.2.0" } }),
+    })
+    const inv = await buildInventory(root, { prod: false })
+    expect(
+      inv.installed.map((d) => [
+        d.version,
+        d.versionSource,
+        d.declaredBy.map((b) => b.manifest),
+      ])
+    ).toEqual([
+      ["1.2.0", "manifest-range", ["functions/package.json"]],
+      ["2.1.0", "lockfile:npm", ["package.json"]],
+    ])
+  })
+
   it("flags patched packages", async () => {
     const root = project({
       "package.json": pkgJson({ dependencies: { a: "^1.0.0" } }),
