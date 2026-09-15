@@ -289,6 +289,42 @@ export declare function email(): EmailSchema
     expect(r.paths.every((p) => p.endsWith("#max"))).toBe(true)
   })
 
+  it("walks a value of a package's type through its instance members", () => {
+    const k = surface(
+      [
+        "export interface Store { list(query?: { size?: number }): string[] }",
+        "export interface Context { store: Store }",
+        "export declare class Client { static create(): Client; send(): void }",
+      ].join("\n"),
+      { name: "kit", types: "index.d.ts" }
+    )
+    const typed = (imported: string, chain: RawRef["chain"]) =>
+      resolveRef(
+        k,
+        ref({
+          pkg: "kit",
+          binding: { kind: "derived" },
+          chain,
+          origin: {
+            binding: { kind: "named", imported },
+            entry: ".",
+            chain: [],
+            callSelf: false,
+            instanceAt: 0,
+          },
+        })
+      ).paths
+    expect(
+      typed("Context", [
+        { name: "store", call: false },
+        { name: "list", call: true },
+      ])
+    ).toEqual(["kit:Context#store", "kit:Store#list"])
+    expect(typed("Client", [{ name: "send", call: true }])).toEqual([
+      "kit:Client#send",
+    ])
+  })
+
   it("flags a name the surface does not have", () => {
     expect(
       resolveRef(s, ref({ chain: [{ name: "nope", call: true }] })).missingHead

@@ -95,6 +95,28 @@ describe("usage link", () => {
     expect(ref?.passed?.max?.line).toBe(3)
   })
 
+  it("follows values of a package's types into their reads and passed keys", async () => {
+    const { usage } = await usageOf(
+      {
+        "package.json": pkgJson({ dependencies: { kit: "^1.0.0" } }),
+        ...dep("kit"),
+        "src/types.ts": `export type { Context } from "kit"\n`,
+        "src/load.ts": `import type { Context } from "./types"\nexport function load(ctx: Context) {\n  return ctx.store.list({\n    size: 5,\n  })\n}\n`,
+      },
+      "kit"
+    )
+    const read = usage?.refs.find((r) => r.binding.kind === "derived")
+    expect(read?.chain.map((c) => c.name)).toEqual(["store", "list"])
+    expect(read?.origin).toMatchObject({
+      binding: { kind: "named", imported: "Context" },
+      chain: [],
+      instanceAt: 0,
+    })
+    expect(read?.site.line).toBe(3)
+    expect(usage?.passedOptions?.size?.map((s) => s.line)).toEqual([3, 4])
+    expect(usage?.weakNames).toEqual(["list", "store"])
+  })
+
   it("counts what it cannot see instead of skipping it", async () => {
     const { usage, global } = await usageOf(
       {

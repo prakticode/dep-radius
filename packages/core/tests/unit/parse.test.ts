@@ -124,6 +124,86 @@ describe("parse: keys passed to calls", () => {
   })
 })
 
+describe("parse: values of a package's types", () => {
+  const typed = (text: string) =>
+    facts(text)
+      .references.filter((r) => r.typed)
+      .map((r) => ({
+        line: r.pos.line,
+        local: r.local,
+        type: [
+          ...r.typed!.chain.map((c) => c.name + (c.call ? "()" : "")),
+          r.typed!.instance ? "instance" : "result",
+        ].join(" "),
+        chain: r.chain.map((c) => c.name + (c.call ? "()" : "")).join("."),
+      }))
+
+  it("reads members through parameters, variables and destructuring", () => {
+    expect(
+      typed(`import type { Context } from "kit"
+import * as kit from "kit"
+async function load(ctx: Context, limit = 5) {
+  return ctx.store.list({ type: "x", limit })
+}
+const pick = ({ store }: Context) => store.get()
+const client = make() as kit.Client
+client.close()
+let maybe: Promise<Context> | undefined
+async function wait() { (await maybe!).store.clear() }
+function all(items: readonly Context[]) { for (const item of items) item.store.count() }
+function started(app: ReturnType<typeof kit.create>) { app.start() }
+use(ctx)
+`)
+    ).toEqual([
+      { line: 4, local: "Context", type: "instance", chain: "store.list()" },
+      { line: 6, local: "Context", type: "instance", chain: "store.get()" },
+      { line: 8, local: "kit", type: "Client instance", chain: "close()" },
+      { line: 10, local: "Context", type: "instance", chain: "store.clear()" },
+      { line: 11, local: "Context", type: "instance", chain: "store.count()" },
+      { line: 12, local: "kit", type: "create() result", chain: "start()" },
+    ])
+  })
+
+  it("records the keys a typed value passes, each where it is written", () => {
+    const f = facts(`import type { Context } from "kit"
+function load(ctx: Context) {
+  return ctx.store.list({
+    size: 5,
+  })
+}`)
+    expect(
+      f.passedKeys.map((p) => [p.line, p.keys, p.at.map((x) => x.line)])
+    ).toEqual([[3, ["size"], [4]]])
+  })
+
+  it("follows scopes: a name declared again without the type is not one", () => {
+    expect(
+      typed(`import type { Context } from "kit"
+function a(ctx: Context) { ctx.run() }
+function b(ctx) { ctx.run() }
+function c(ctx: Context) { return (ctx) => ctx.run() }
+function d(ctx: Context) { { const ctx = other(); ctx.run() } }
+`)
+    ).toEqual([{ line: 2, local: "Context", type: "instance", chain: "run()" }])
+  })
+
+  it("reads class properties through this, until a function rebinds it", () => {
+    expect(
+      typed(`import { Client, type Options } from "kit"
+class Service {
+  private options: Options
+  constructor(private readonly client: Client) {}
+  run() { return this.client.send(this.options.retries) }
+  later() { return function () { return this.client.send() } }
+}
+`)
+    ).toEqual([
+      { line: 5, local: "Client", type: "instance", chain: "send()" },
+      { line: 5, local: "Options", type: "instance", chain: "retries" },
+    ])
+  })
+})
+
 describe("parse: references", () => {
   it("climbs member chains and marks the first call", () => {
     expect(

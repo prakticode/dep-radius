@@ -92,6 +92,12 @@ type Cursor = { kind: "ns"; base: string } | { kind: "type"; path: CanonPath }
 // Level 1: walk a usage chain through a surface. `v.email().max(254)` from "lib" resolves to
 // lib:email, then through its return type to lib:EmailSchema#max.
 export function resolveRef(surface: Surface, ref: RawRef): Resolution {
+  return walk(surface, ref)
+}
+
+// `instanceAt`: the value is an instance of the type named by the binding and the first
+// `instanceAt` segments of the chain, so the walk goes on through its instance members.
+function walk(surface: Surface, ref: RawRef, instanceAt?: number): Resolution {
   // the surface's own name: @types/lib answers for code that imports "lib"
   const prefix = entryPrefix(surface.pkg, ref.entry)
   const out: Resolution = { paths: [], unresolvedTail: [], missingHead: false }
@@ -102,27 +108,36 @@ export function resolveRef(surface: Surface, ref: RawRef): Resolution {
     }
     // walk the construction, then the reads: only the reads are this site's own paths
     const o = ref.origin
-    const base = resolveRef(surface, {
-      ...ref,
-      binding: o.binding,
-      entry: o.entry,
-      chain: o.chain,
-      callSelf: o.callSelf,
-      origin: undefined,
-    })
-    const full = resolveRef(surface, {
-      ...ref,
-      binding: o.binding,
-      entry: o.entry,
-      chain: [
-        ...o.chain.map((s, i) =>
-          i === o.chain.length - 1 && ref.callSelf ? { ...s, call: true } : s
-        ),
-        ...ref.chain,
-      ],
-      callSelf: o.chain.length === 0 ? o.callSelf || ref.callSelf : o.callSelf,
-      origin: undefined,
-    })
+    const base = walk(
+      surface,
+      {
+        ...ref,
+        binding: o.binding,
+        entry: o.entry,
+        chain: o.chain,
+        callSelf: o.callSelf,
+        origin: undefined,
+      },
+      o.instanceAt
+    )
+    const full = walk(
+      surface,
+      {
+        ...ref,
+        binding: o.binding,
+        entry: o.entry,
+        chain: [
+          ...o.chain.map((s, i) =>
+            i === o.chain.length - 1 && ref.callSelf ? { ...s, call: true } : s
+          ),
+          ...ref.chain,
+        ],
+        callSelf:
+          o.chain.length === 0 ? o.callSelf || ref.callSelf : o.callSelf,
+        origin: undefined,
+      },
+      o.instanceAt
+    )
     // the walk is sequential, so the construction's paths are a prefix of the full walk
     const prefixLen = base.paths.every((p, i) => full.paths[i] === p)
       ? base.paths.length
@@ -180,7 +195,21 @@ export function resolveRef(surface: Surface, ref: RawRef): Resolution {
     startCall = ref.callSelf
   }
 
-  if (startCall) {
+  // the index of the segment naming the type of an instance; -1 is the module itself
+  const typeEnd =
+    instanceAt === undefined
+      ? undefined
+      : segs.length - ref.chain.length + instanceAt - 1
+  if (typeEnd === -1) {
+    const self = b.kind === "named" ? undefined : sym(modulePath)
+    const next = self && instanceCursor(self)
+    if (!next) {
+      out.unresolvedTail = segs.map((s) => s.name)
+      return out
+    }
+    out.paths.push(modulePath)
+    cursor = next
+  } else if (startCall) {
     const self = surface.symbols[modulePath]
     if (!self) {
       out.unresolvedTail = segs.map((s) => s.name)
@@ -213,6 +242,10 @@ export function resolveRef(surface: Surface, ref: RawRef): Resolution {
     }
     out.paths.push(path)
     if (raw.aliasOf && found.path !== path) out.paths.push(found.path)
+    if (i === typeEnd) {
+      cursor = instanceCursor(found)
+      continue
+    }
     if (found.kind === "namespace") {
       cursor = { kind: "ns", base: found.path }
       continue
@@ -236,6 +269,16 @@ export function resolveRef(surface: Surface, ref: RawRef): Resolution {
         found.kind === "variable" ? { kind: "ns", base: found.path } : undefined
   }
   return out
+}
+
+// Where an instance of a symbol's type keeps its members: a class at its own `#` paths, an interface
+// or a type alias at theirs.
+function instanceCursor(found: SurfaceSymbol): Cursor | undefined {
+  if (found.kind === "class")
+    return { kind: "type", path: found.instanceOf ?? found.path }
+  if (found.kind === "interface" || found.kind === "type")
+    return { kind: "type", path: found.path }
+  return found.instanceOf ? { kind: "type", path: found.instanceOf } : undefined
 }
 
 // Strong: segments up to and including the first call. Weak: what follows, and everything on a

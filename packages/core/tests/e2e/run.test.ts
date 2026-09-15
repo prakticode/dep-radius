@@ -30,6 +30,12 @@ export declare function email(): Schema
 ${extra}
 `
 
+// `toString` as an option: a key the code never passes must not read an object's own members
+const typedTypes = (count: string) => `
+export interface Store { list(query?: { type?: string; ${count}?: number; toString?: string }): string[] }
+export interface Context { store: Store }
+`
+
 function version(
   name: string,
   v: string,
@@ -126,6 +132,19 @@ const packages: FakePackage[] = [
     releases: { "v3.1.0": "- Internal cleanup\n" },
   },
   {
+    // an option of a member reached through a value the project declares with the package's type
+    name: "acme-typed",
+    repository: "git+https://github.com/acme/typed.git",
+    versions: [
+      version("acme-typed", "1.0.0", OLD, typedTypes("limit")),
+      version("acme-typed", "1.1.0", NEWISH, typedTypes("size")),
+    ],
+    releases: {
+      "v1.1.0":
+        "- **Breaking:** `limit` is gone from the query shapes, use `{ page, size }`.\n",
+    },
+  },
+  {
     // no types, no notes anywhere: invisible, so never quiet
     name: "acme-dark",
     versions: [
@@ -190,6 +209,7 @@ describe("run, end to end against a fake registry", () => {
       installed("acme-quiet", "1.0.0", schemaTypes()),
       installed("acme-notes", "2.0.0", schemaTypes()),
       installed("acme-member", "3.0.0", schemaTypes()),
+      installed("acme-typed", "1.0.0", typedTypes("limit")),
       installed("acme-dark", "1.0.0"),
       installed("acme-cli", "1.0.0", undefined, { bin: { acme: "cli.js" } }),
     ]
@@ -209,6 +229,7 @@ describe("run, end to end against a fake registry", () => {
             "acme-quiet": "^1.0.0",
             "acme-notes": "^2.0.0",
             "acme-member": "^3.0.0",
+            "acme-typed": "^1.0.0",
             "acme-dark": "^1.0.0",
             "acme-cli": "^1.0.0",
           },
@@ -219,6 +240,7 @@ describe("run, end to end against a fake registry", () => {
         "packages/app/src/quiet.ts": `import * as q from "acme-quiet"\n\n// q.iban() is not called, a comment is not usage\nq.object({}).strict()\n`,
         "packages/app/src/schema.ts": `import { object } from "acme-member"\n\nexport const user = object({})\n`,
         "packages/app/src/member.ts": `import { user } from "./schema"\n\nexport function check(x: unknown) {\n  return user.parse(x)\n}\n`,
+        "packages/app/src/typed.ts": `import type { Context } from "acme-typed"\n\nexport function load(ctx: Context) {\n  return ctx.store.list({\n    type: "x",\n    limit: 5,\n  })\n}\n`,
         "packages/app/src/dark.js": `const dark = require("acme-dark")\n\ndark.shade()\n`,
         ...Object.assign({}, ...inst.map((i) => i.files)),
       },
@@ -276,6 +298,19 @@ describe("run, end to end against a fake registry", () => {
     expect(changed?.strength).toBe("strong")
     expect(changed?.sites.map((s) => `${s.file}:${s.line}`)).toEqual([
       "packages/app/src/member.ts:4",
+    ])
+  })
+
+  it("ties a note about an option to a call on a value of the package's type", () => {
+    const p = byName("acme-typed")
+    expect(p.verdict).toBe("review")
+    expect(p.surface.status).toBe("computed")
+    expect(p.notes.matched.map((m) => m.hits.map((h) => h.name))).toEqual([
+      ["limit"],
+    ])
+    expect(p.usage.byName.limit?.map((s) => `${s.file}:${s.line}`)).toEqual([
+      "packages/app/src/typed.ts:4",
+      "packages/app/src/typed.ts:6",
     ])
   })
 

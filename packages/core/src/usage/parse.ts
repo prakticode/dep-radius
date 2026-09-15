@@ -40,6 +40,17 @@ export interface Reference {
   derivedInto?: string
   // parameters of functions passed to a call in this chain: `app.get(path, (req, res) => ...)`
   callbackInto?: string[]
+  // a read of a value whose declared type the binding names: `(ctx: Context) => ctx.store.list()`
+  // is `local` Context, `typed` { chain: [], instance }, and `chain` the reads on the value
+  typed?: TypedOrigin
+}
+
+// The type a value is declared with, from the binding: `ns.Options` is chain [Options], an
+// instance; `ReturnType<typeof create>` is the result of calling `create`, not an instance.
+export interface TypedOrigin {
+  chain: ChainSeg[]
+  callSelf: boolean
+  instance: boolean
 }
 
 // require("p").a / (await import("p")).a / import("p").then(...) without a named binding
@@ -328,6 +339,7 @@ function parseBlock(
         at: passed.map((p) => pos(p.node)),
       })
   }
+  const typed = typedValues(sf, bindings)
   const visit = (node: ts.Node): void => {
     if (
       ts.isIdentifier(node) &&
@@ -341,6 +353,38 @@ function parseBlock(
       recordPassed(at, passed)
       if (ref.derivedInto) derived.set(ref.derivedInto, true)
       for (const cb of ref.callbackInto ?? []) derived.set(cb, true)
+    } else if (typed.names.has(node)) {
+      const t = typed.names.get(node)!
+      const r = climbFrom(node)
+      const chain = [...t.prefix.map((s) => ({ ...s })), ...r.chain]
+      let callSelf = r.callSelf
+      if (callSelf && t.prefix.length > 0) {
+        chain[t.prefix.length - 1]!.call = true
+        callSelf = false
+      }
+      // a value handed on whole says nothing about which members are read
+      if (!r.typeOnly && (chain.length > 0 || callSelf)) {
+        const at = pos(node)
+        facts.references.push({
+          local: t.origin.local,
+          chain,
+          callSelf,
+          typeOnly: false,
+          pos: at,
+          escape: false,
+          computed: r.computed,
+          typed: {
+            chain: t.origin.chain,
+            callSelf: t.origin.callSelf,
+            instance: t.origin.instance,
+          },
+          ...(r.derivedInto ? { derivedInto: r.derivedInto } : {}),
+          ...(r.callbackInto ? { callbackInto: r.callbackInto } : {}),
+        })
+        recordPassed(at, r.passed)
+        if (r.derivedInto) derived.set(r.derivedInto, true)
+        for (const cb of r.callbackInto ?? []) derived.set(cb, true)
+      }
     } else if (ts.isCallExpression(node)) {
       handleCall(node)
     } else if (
@@ -438,6 +482,7 @@ function parseBlock(
       if (
         ts.isIdentifier(node) &&
         names.has(node.text) &&
+        !typed.names.has(node) &&
         isReferencePosition(node)
       ) {
         const r = climbFrom(node)
@@ -743,4 +788,307 @@ function bindingNames(name: ts.BindingName): string[] {
   for (const el of name.elements)
     if (!ts.isOmittedExpression(el)) out.push(...bindingNames(el.name))
   return out
+}
+
+// ---------------------------------------------------------------- values of a package's types
+
+interface TypeOrigin {
+  // the import the type is named through
+  local: string
+  chain: ChainSeg[]
+  callSelf: boolean
+  instance: boolean
+  // an array of such values: only `for (const x of xs)` reads one
+  element?: boolean
+}
+
+interface TypedName {
+  origin: TypeOrigin
+  // the members a destructuring reads first: `({ store }: Context)` is store on a Context
+  prefix: ChainSeg[]
+}
+
+// wrappers whose value, once awaited or narrowed, still has the members of the type they wrap
+const WRAPPERS = new Set([
+  "Promise",
+  "PromiseLike",
+  "Awaited",
+  "Readonly",
+  "Partial",
+  "Required",
+  "NonNullable",
+])
+
+// The identifiers (and `this.member` reads) in a file whose value is declared with a type the
+// file imports: parameters, variables, destructuring, class properties and `for...of` over an
+// array of them. Scopes are followed, so a name declared again without such a type is not one.
+// Parser only: a type the code never writes (inferred, or given by a callback's context) is unseen.
+function typedValues(
+  sf: ts.SourceFile,
+  bindings: Map<string, ImportBinding>
+): { names: Map<ts.Node, TypedName> } {
+  const names = new Map<ts.Node, TypedName>()
+  if (bindings.size === 0) return { names }
+  const declared = new Map<ts.Identifier, TypedName>()
+  const forOf = new Map<ts.Identifier, ts.Expression>()
+  const members = new Map<ts.Node, Map<string, TypedName>>()
+  const candidates = new Set<string>()
+
+  const typeOrigin = (
+    t: ts.TypeNode | undefined,
+    depth = 0
+  ): TypeOrigin | undefined => {
+    if (!t || depth > 6) return undefined
+    if (ts.isParenthesizedTypeNode(t)) return typeOrigin(t.type, depth + 1)
+    if (
+      ts.isTypeOperatorNode(t) &&
+      t.operator === ts.SyntaxKind.ReadonlyKeyword
+    )
+      return typeOrigin(t.type, depth + 1)
+    if (ts.isUnionTypeNode(t)) {
+      const rest = t.types.filter((x) => !isNullishType(x))
+      return rest.length === 1 ? typeOrigin(rest[0], depth + 1) : undefined
+    }
+    if (ts.isArrayTypeNode(t))
+      return elementOf(typeOrigin(t.elementType, depth + 1))
+    if (!ts.isTypeReferenceNode(t)) return undefined
+    const [head, ...rest] = entityNames(t.typeName)
+    if (!head) return undefined
+    if (bindings.has(head))
+      return {
+        local: head,
+        chain: rest.map((name) => ({ name, call: false })),
+        callSelf: false,
+        instance: true,
+      }
+    const arg = t.typeArguments?.length === 1 ? t.typeArguments[0] : undefined
+    if (rest.length > 0 || !arg) return undefined
+    if (WRAPPERS.has(head)) return typeOrigin(arg, depth + 1)
+    if (head === "Array" || head === "ReadonlyArray")
+      return elementOf(typeOrigin(arg, depth + 1))
+    if (
+      (head === "ReturnType" || head === "InstanceType") &&
+      ts.isTypeQueryNode(arg)
+    ) {
+      const [local, ...path] = entityNames(arg.exprName)
+      if (!local || !bindings.has(local)) return undefined
+      const chain = path.map((name) => ({ name, call: false }))
+      if (head === "InstanceType")
+        return { local, chain, callSelf: false, instance: true }
+      if (chain.length > 0) chain[chain.length - 1]!.call = true
+      return { local, chain, callSelf: chain.length === 0, instance: false }
+    }
+    return undefined
+  }
+
+  const bind = (
+    name: ts.BindingName,
+    origin: TypeOrigin,
+    prefix: ChainSeg[]
+  ): void => {
+    if (ts.isIdentifier(name)) {
+      declared.set(name, { origin, prefix })
+      candidates.add(name.text)
+      return
+    }
+    // an element of an array pattern is not a member the type names
+    if (!ts.isObjectBindingPattern(name) || origin.element) return
+    for (const el of name.elements) {
+      if (el.dotDotDotToken) {
+        bind(el.name, origin, prefix)
+        continue
+      }
+      const key = el.propertyName
+        ? propertyName(el.propertyName)
+        : ts.isIdentifier(el.name)
+          ? el.name.text
+          : undefined
+      if (key) bind(el.name, origin, [...prefix, { name: key, call: false }])
+    }
+  }
+
+  const memberOf = (cls: ts.Node): Map<string, TypedName> => {
+    let m = members.get(cls)
+    if (!m) {
+      m = new Map()
+      members.set(cls, m)
+    }
+    return m
+  }
+
+  const collect = (node: ts.Node): void => {
+    if (ts.isParameter(node)) {
+      const origin = typeOrigin(node.type)
+      if (origin) {
+        bind(node.name, origin, [])
+        if (
+          ts.isParameterPropertyDeclaration(node, node.parent) &&
+          ts.isIdentifier(node.name) &&
+          !origin.element
+        )
+          memberOf(node.parent.parent).set(node.name.text, {
+            origin,
+            prefix: [],
+          })
+      }
+    } else if (ts.isVariableDeclaration(node)) {
+      const init = node.initializer
+      const origin =
+        typeOrigin(node.type) ??
+        (init && (ts.isAsExpression(init) || ts.isTypeAssertionExpression(init))
+          ? typeOrigin(init.type)
+          : undefined)
+      if (origin) bind(node.name, origin, [])
+      else if (
+        ts.isIdentifier(node.name) &&
+        ts.isVariableDeclarationList(node.parent) &&
+        ts.isForOfStatement(node.parent.parent)
+      ) {
+        forOf.set(node.name, node.parent.parent.expression)
+        candidates.add(node.name.text)
+      }
+    } else if (
+      ts.isPropertyDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      ts.isClassLike(node.parent)
+    ) {
+      const origin = typeOrigin(node.type)
+      if (origin && !origin.element)
+        memberOf(node.parent).set(node.name.text, { origin, prefix: [] })
+    }
+    node.forEachChild(collect)
+  }
+  sf.forEachChild(collect)
+  if (candidates.size === 0 && members.size === 0) return { names }
+
+  const resolve = (id: ts.Identifier, depth = 0): TypedName | undefined => {
+    const decl = declarationOf(id.text, id)
+    if (!decl) return undefined
+    const direct = declared.get(decl)
+    if (direct) return direct
+    let e = forOf.get(decl)
+    if (!e || depth > 3) return undefined
+    while (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e))
+      e = e.expression
+    const of = ts.isIdentifier(e) ? resolve(e, depth + 1) : undefined
+    if (!of?.origin.element || of.prefix.length > 0) return undefined
+    const { element: _element, ...origin } = of.origin
+    return { origin, prefix: [] }
+  }
+
+  const find = (node: ts.Node): void => {
+    if (
+      ts.isIdentifier(node) &&
+      candidates.has(node.text) &&
+      !bindings.has(node.text) &&
+      isReferencePosition(node)
+    ) {
+      const t = resolve(node)
+      if (t && !t.origin.element) names.set(node, t)
+    } else if (
+      members.size > 0 &&
+      ts.isPropertyAccessExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      ts.isIdentifier(node.name)
+    ) {
+      const cls = thisClass(node)
+      const t = cls && members.get(cls)?.get(node.name.text)
+      if (t) names.set(node, t)
+    }
+    node.forEachChild(find)
+  }
+  sf.forEachChild(find)
+  return { names }
+}
+
+function elementOf(o: TypeOrigin | undefined): TypeOrigin | undefined {
+  return o && !o.element && o.instance ? { ...o, element: true } : undefined
+}
+
+function isNullishType(t: ts.TypeNode): boolean {
+  return (
+    t.kind === ts.SyntaxKind.UndefinedKeyword ||
+    t.kind === ts.SyntaxKind.VoidKeyword ||
+    (ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword)
+  )
+}
+
+function entityNames(n: ts.EntityName): string[] {
+  return ts.isIdentifier(n) ? [n.text] : [...entityNames(n.left), n.right.text]
+}
+
+function bindsName(n: ts.BindingName, name: string): ts.Identifier | undefined {
+  if (ts.isIdentifier(n)) return n.text === name ? n : undefined
+  for (const el of n.elements) {
+    if (ts.isOmittedExpression(el)) continue
+    const hit = bindsName(el.name, name)
+    if (hit) return hit
+  }
+  return undefined
+}
+
+// The identifier that declares `name` for a use at `from`, walking out through the scopes.
+function declarationOf(name: string, from: ts.Node): ts.Identifier | undefined {
+  for (let cur: ts.Node | undefined = from.parent; cur; cur = cur.parent) {
+    if (ts.isFunctionLike(cur)) {
+      for (const p of cur.parameters) {
+        const hit = bindsName(p.name, name)
+        if (hit) return hit
+      }
+      if (
+        (ts.isFunctionExpression(cur) || ts.isFunctionDeclaration(cur)) &&
+        cur.name?.text === name
+      )
+        return cur.name
+    }
+    const statements =
+      ts.isBlock(cur) ||
+      ts.isSourceFile(cur) ||
+      ts.isModuleBlock(cur) ||
+      ts.isCaseClause(cur) ||
+      ts.isDefaultClause(cur)
+        ? cur.statements
+        : undefined
+    for (const st of statements ?? []) {
+      if (ts.isVariableStatement(st)) {
+        for (const d of st.declarationList.declarations) {
+          const hit = bindsName(d.name, name)
+          if (hit) return hit
+        }
+      } else if (
+        (ts.isFunctionDeclaration(st) ||
+          ts.isClassDeclaration(st) ||
+          ts.isEnumDeclaration(st)) &&
+        st.name?.text === name
+      )
+        return st.name
+    }
+    if (
+      (ts.isForOfStatement(cur) ||
+        ts.isForInStatement(cur) ||
+        ts.isForStatement(cur)) &&
+      cur.initializer &&
+      ts.isVariableDeclarationList(cur.initializer)
+    ) {
+      for (const d of cur.initializer.declarations) {
+        const hit = bindsName(d.name, name)
+        if (hit) return hit
+      }
+    }
+    if (ts.isCatchClause(cur) && cur.variableDeclaration) {
+      const hit = bindsName(cur.variableDeclaration.name, name)
+      if (hit) return hit
+    }
+  }
+  return undefined
+}
+
+// The class `this` is an instance of at a node: arrow functions keep it, other functions rebind it.
+function thisClass(node: ts.Node): ts.ClassLikeDeclaration | undefined {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (ts.isClassLike(cur)) return cur
+    if (ts.isFunctionDeclaration(cur) || ts.isFunctionExpression(cur))
+      return undefined
+  }
+  return undefined
 }

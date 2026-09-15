@@ -129,6 +129,9 @@ export interface RefOrigin {
   entry: string
   chain: ChainSeg[]
   callSelf: boolean
+  // the value is an instance of the type the first `instanceAt` segments name (after the binding):
+  // `ctx: Context` reads Context's members, not its statics
+  instanceAt?: number
 }
 
 export interface RawRef {
