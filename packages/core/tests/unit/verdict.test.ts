@@ -187,6 +187,29 @@ describe("decide", () => {
     }
   })
 
+  it("never calls a package quiet while a source it skipped disagrees with the manifest", () => {
+    const r = decide(
+      clean({
+        outOfSync: [
+          { source: "lockfile:npm", version: "2.3.0", spec: "2.4.0" },
+          { source: "lockfile:npm", version: "2.3.0", spec: "2.4.0" },
+          {
+            source: "node_modules",
+            version: "1.0.0",
+            spec: "^1.0.1",
+            at: "main",
+          },
+        ],
+      })
+    )
+    expect(r.verdict).toBe("review")
+    expect(r.reasons).toContainEqual({
+      code: "out-of-sync",
+      detail:
+        "package.json asks for 2.4.0 but the lockfile has 2.3.0, so that version was not used; at main, package.json asks for ^1.0.1 but node_modules has 1.0.0, so that version was not used",
+    })
+  })
+
   it("never calls an unreferenced package quiet", () => {
     expect(
       decide(clean({ usage: undefined })).reasons.map((x) => x.code)

@@ -28,9 +28,11 @@ export function yarnLock(text: string): LockReader | undefined {
       for (const c of candidates) {
         const v = byDescriptor.get(c)
         if (v)
+          // entries are keyed by the specifier, so a hit was written for this one
           return {
             version: v,
             name: spec.startsWith("npm:") ? (aliasName(spec) ?? key) : key,
+            specifier: spec,
           }
       }
       return undefined

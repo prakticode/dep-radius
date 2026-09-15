@@ -144,12 +144,17 @@ export function planSince(
         ? semver.compare(a.version, b.version)
         : a.version.localeCompare(b.version)
     )[0]!
+    const outOfSync = [
+      ...(prev.outOfSync ?? []).map((s) => ({ ...s, at: ref })),
+      ...(dep.outOfSync ?? []),
+    ]
     plan.changed.push({
       dep: {
         ...dep,
         version: prev.version,
         versionSource: prev.versionSource,
         flags: [...new Set([...dep.flags, ...prev.flags])],
+        ...(outOfSync.length > 0 ? { outOfSync } : {}),
       },
       to: dep.version,
     })

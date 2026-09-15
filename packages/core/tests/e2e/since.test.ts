@@ -253,6 +253,78 @@ describe("run --since, from a package of a monorepo", () => {
   })
 })
 
+describe("run --since, when the change bumps a pin and leaves the lockfile behind", () => {
+  let root: string
+  let cleanup: () => void
+  let brief: Brief
+
+  beforeAll(async () => {
+    const project = createProject({
+      files: {
+        "package.json": pkgJson({
+          name: "app",
+          private: true,
+          dependencies: { "acme-lib": "1.0.0" },
+        }),
+        // written by npm: the root entry repeats what the manifest declared
+        "package-lock.json": `${JSON.stringify(
+          {
+            lockfileVersion: 3,
+            packages: {
+              "": { name: "app", dependencies: { "acme-lib": "1.0.0" } },
+              "node_modules/acme-lib": { version: "1.0.0" },
+            },
+          },
+          null,
+          2
+        )}\n`,
+        "src/index.ts": `import { legacy } from "acme-lib"\n\nlegacy()\n`,
+      },
+    })
+    root = project.root
+    cleanup = project.cleanup
+    rmSync(join(root, ".git"), { recursive: true })
+    git(root, "init", "-q", "-b", "main")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "base")
+    writeFileSync(
+      join(root, "package.json"),
+      pkgJson({
+        name: "app",
+        private: true,
+        dependencies: { "acme-lib": "1.1.0" },
+      })
+    )
+
+    const opts = testOptions(root, { since: "main" })
+    brief = await run(opts, testCtx(opts, new FakeRegistry(packages)))
+  })
+
+  afterAll(() => cleanup())
+
+  it("compares the version the manifest pins, not the stale lockfile entry", () => {
+    expect(brief.packages.map((p) => [p.pkg, p.from, p.to])).toEqual([
+      ["acme-lib", "1.0.0", "1.1.0"],
+    ])
+    expect(brief.packages[0]!.verdict).toBe("blocked")
+  })
+
+  it("says the lockfile disagrees with the manifest", () => {
+    expect(brief.packages[0]!.reasons).toContainEqual({
+      code: "out-of-sync",
+      detail:
+        "package.json asks for 1.1.0 but the lockfile has 1.0.0, so that version was not used",
+    })
+    const schema = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "../../schema/brief-v1.schema.json"),
+        "utf8"
+      )
+    ) as Record<string, unknown>
+    expect(validate(JSON.parse(renderJson(brief)), schema)).toEqual([])
+  })
+})
+
 describe("planSince", () => {
   const dep = (name: string, version: string, manifest = "package.json") => ({
     id: `lockfile:npm:${name}@${version}`,

@@ -1,6 +1,7 @@
 import { UNSEEN_LABEL } from "../labels.ts"
 import type {
   InstalledDep,
+  OutOfSync,
   PackageBrief,
   PackageUsage,
   Verdict,
@@ -11,6 +12,7 @@ export interface VerdictInput {
   bump: PackageBrief["bump"]
   zeroMajor: boolean
   flags: InstalledDep["flags"]
+  outOfSync?: OutOfSync[]
   usage: PackageUsage | undefined
   surface: PackageBrief["surface"] & { incomplete?: boolean }
   notes: PackageBrief["notes"]
@@ -111,6 +113,15 @@ export function decide(input: VerdictInput): {
       detail: `the installed copy is ${flagged.join(", ")}`,
     })
 
+  // the versions compared are not what the stale source says, so the brief may not be what the
+  // project will run until it installs again
+  if (input.outOfSync && input.outOfSync.length > 0)
+    reasons.push({
+      code: "out-of-sync",
+      // several manifests declaring the same version report the same gap once
+      detail: [...new Set(input.outOfSync.map(outOfSyncLabel))].join("; "),
+    })
+
   // a wrapper's shape lives in the package it wraps: no types of its own is not the same as no shape
   if (
     surface.status === "failed" ||
@@ -173,6 +184,12 @@ export function decide(input: VerdictInput): {
       })
   }
   return { verdict, reasons }
+}
+
+function outOfSyncLabel(s: OutOfSync): string {
+  const where =
+    s.source === "node_modules" ? "node_modules has" : "the lockfile has"
+  return `${s.at ? `at ${s.at}, ` : ""}package.json asks for ${s.spec} but ${where} ${s.version}, so that version was not used`
 }
 
 function plural(n: number, word: string): string {
