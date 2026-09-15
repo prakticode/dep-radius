@@ -282,9 +282,10 @@ function instanceCursor(found: SurfaceSymbol): Cursor | undefined {
 }
 
 // Strong: segments up to and including the first call. Weak: what follows, and everything on a
-// derived value or on the result of calling the package itself (`createApp().use`).
+// derived value or on the result of calling the package itself (`createApp().use`). A value declared
+// with the package's type (`cmd: Command`) is no guess: its reads count as the import's would.
 export function level0Names(ref: RawRef): { strong: string[]; weak: string[] } {
-  if (ref.binding.kind === "derived")
+  if (ref.binding.kind === "derived" && !declaredInstance(ref))
     return { strong: [], weak: ref.chain.map((s) => s.name) }
   const { segs, startsCalled } = effectiveChain(ref)
   const strong: string[] = []
@@ -296,4 +297,15 @@ export function level0Names(ref: RawRef): { strong: string[]; weak: string[] } {
     if (s.call) called = true
   }
   return { strong, weak }
+}
+
+// An instance of a type the package exports, reached without calling anything since its
+// declaration: `ctx: Context`, or `const store = ctx.store`, but not `const r = ctx.load()`.
+function declaredInstance(ref: RawRef): boolean {
+  const o = ref.origin
+  return (
+    o?.instanceAt !== undefined &&
+    !o.callSelf &&
+    o.chain.every((s) => !s.call && !s.construct)
+  )
 }

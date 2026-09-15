@@ -114,7 +114,21 @@ describe("usage link", () => {
     })
     expect(read?.site.line).toBe(3)
     expect(usage?.passedOptions?.size?.map((s) => s.line)).toEqual([3, 4])
-    expect(usage?.weakNames).toEqual(["list", "store"])
+    expect(usage?.strongNames).toEqual(["Context", "list", "store"])
+    expect(usage?.weakNames).toEqual([])
+  })
+
+  it("reads a value declared with a package's type as surely as the import, up to its first call", async () => {
+    const { usage } = await usageOf(
+      {
+        "package.json": pkgJson({ dependencies: { kit: "^1.0.0" } }),
+        ...dep("kit"),
+        "src/cli.ts": `import { Command } from "kit"\n\nexport class Cli {\n  constructor(private readonly program: Command) {}\n\n  init() {\n    this.program.command("run").action(() => undefined)\n  }\n\n  pass = (cmd: Command) => cmd.args\n}\n`,
+      },
+      "kit"
+    )
+    expect(usage?.strongNames).toEqual(["Command", "args", "command"])
+    expect(usage?.weakNames).toEqual(["action"])
   })
 
   it("counts what it cannot see instead of skipping it", async () => {
