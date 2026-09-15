@@ -8,6 +8,7 @@ import {
   parseFailOn,
   planComment,
   shouldFail,
+  summaryBody,
   verdictOf,
 } from "./report.ts"
 
@@ -30,7 +31,7 @@ appendIfSet(
   "GITHUB_OUTPUT",
   `verdict=${verdict}\nexit-code=${brief.exitCode}\njson=${jsonPath}\nmarkdown=${markdownPath}\n`
 )
-appendIfSet("GITHUB_STEP_SUMMARY", markdown)
+appendIfSet("GITHUB_STEP_SUMMARY", summaryBody(markdown, brief.tool.version))
 
 if (env.INPUT_COMMENT === "true") {
   const pr = pullRequestNumber()
@@ -40,7 +41,8 @@ if (env.INPUT_COMMENT === "true") {
     )
   else
     await upsertComment(pr).catch((error: unknown) => {
-      // a read-only token (Dependabot, forks) cannot comment; the summary still has the brief
+      // a read-only token (forks, or a job without pull-requests: write) cannot comment; the
+      // summary still has the brief
       console.log(
         `::warning title=dep-radius::could not comment on the pull request: ${String(error)}. Give the job "pull-requests: write", or read the brief in the job summary.`
       )
