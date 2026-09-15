@@ -1,0 +1,18 @@
+{
+  "package": "markdown-it",
+  "from": "14.1.0",
+  "to": "15.0.0",
+  "repository": "https://github.com/markdown-it/markdown-it",
+  "sources": {
+    "15.0.0": "https://github.com/markdown-it/markdown-it/blob/15.0.0/CHANGELOG.md"
+  },
+  "change": [
+    "No fuzzy links by default"
+  ],
+  "why": "linkify-it 6 turns fuzzy links off by default, so bare domains such as example.com and www.example.com in rendered text stay plain text instead of becoming links. The entry names only the dependency, and the behaviour is in its nested items.",
+  "expect": [
+    "src/render.js:4",
+    "src/render.js:5"
+  ],
+  "status": "caught"
+}
