@@ -73,22 +73,41 @@ interface FoundLock {
   dir: string
 }
 
-// The nearest lockfile, from `root` up to the repository root: a package of a monorepo has none of
-// its own. Outside a repository only `root` itself is looked at, so a stray lockfile in a parent
-// folder never answers for a project.
-async function loadLock(root: string): Promise<FoundLock | undefined> {
-  const tries: [string, (t: string) => LockReader | undefined][] = [
-    ["pnpm-lock.yaml", pnpmLock],
-    ["package-lock.json", npmLock],
-    ["npm-shrinkwrap.json", npmLock],
-    ["yarn.lock", yarnLock],
-    ["bun.lock", bunLock],
-  ]
-  const boundary = projectBoundary(root)
-  const inRepository = existsSync(join(boundary, ".git"))
-  let dir = root
+const LOCKFILES: [string, (t: string) => LockReader | undefined][] = [
+  ["pnpm-lock.yaml", pnpmLock],
+  ["package-lock.json", npmLock],
+  ["npm-shrinkwrap.json", npmLock],
+  ["yarn.lock", yarnLock],
+  ["bun.lock", bunLock],
+]
+
+// The folder of the nearest lockfile, from `dir` up to `stopAt`. A folder with a lockfile of its own
+// is installed on its own (a `functions/` folder next to a web app, say): its dependencies are not
+// the ones of the folders above it, and Node finds them in its own node_modules.
+export function lockDirFor(dir: string, stopAt: string): string | undefined {
+  let d = dir
   for (;;) {
-    for (const [file, reader] of tries) {
+    if (LOCKFILES.some(([file]) => existsSync(join(d, file)))) return d
+    if (d === stopAt) return undefined
+    const parent = dirname(d)
+    if (parent === d) return undefined
+    d = parent
+  }
+}
+
+// The nearest lockfile, from a manifest's folder up to the repository root: a package of a
+// monorepo has none of its own and reads the root one, a separately installed folder reads its
+// own. Outside a repository the walk stops at `root`, so a stray lockfile in a parent folder never
+// answers for a project.
+async function loadLock(
+  from: string,
+  root: string
+): Promise<FoundLock | undefined> {
+  const boundary = projectBoundary(root)
+  const stopAt = existsSync(join(boundary, ".git")) ? boundary : root
+  let dir = from
+  for (;;) {
+    for (const [file, reader] of LOCKFILES) {
       const p = join(dir, file)
       if (!existsSync(p)) continue
       try {
@@ -98,7 +117,7 @@ async function loadLock(root: string): Promise<FoundLock | undefined> {
         // unreadable lockfile: fall through to the next source
       }
     }
-    if (!inRepository || dir === boundary) return undefined
+    if (dir === stopAt) return undefined
     const parent = dirname(dir)
     if (parent === dir) return undefined
     dir = parent
@@ -210,13 +229,34 @@ export async function buildInventory(
 ): Promise<Inventory> {
   const projectFiles = files ?? (await listProjectFiles(root))
   const manifests = await findManifests(root, projectFiles)
-  const lock = await loadLock(root)
   const patched = await patchedNames(root)
-  const lockDir = lock?.dir ?? root
-  const overridden = await overriddenNames([...new Set([root, lockDir])])
-  const hasPnp =
-    existsSync(join(lockDir, ".pnp.cjs")) ||
-    existsSync(join(lockDir, ".pnp.js"))
+  // one install per lockfile: its versions, its overrides, its Plug'n'Play
+  const installs = new Map<
+    string,
+    Promise<{
+      lock: FoundLock | undefined
+      overridden: Set<string>
+      hasPnp: boolean
+    }>
+  >()
+  const installFor = (dir: string) => {
+    let p = installs.get(dir)
+    if (!p) {
+      p = (async () => {
+        const lock = await loadLock(dir, root)
+        const lockDir = lock?.dir ?? root
+        return {
+          lock,
+          overridden: await overriddenNames([...new Set([root, lockDir])]),
+          hasPnp:
+            existsSync(join(lockDir, ".pnp.cjs")) ||
+            existsSync(join(lockDir, ".pnp.js")),
+        }
+      })()
+      installs.set(dir, p)
+    }
+    return p
+  }
 
   const byId = new Map<string, InstalledDep>()
   const local = new Set<string>()
@@ -248,6 +288,7 @@ export async function buildInventory(
         })
         continue
       }
+      const { lock, hasPnp, overridden } = await installFor(m.dir)
       const found = await resolveDep(root, m, d, lock, hasPnp, overridden)
       if (!found) {
         if (workspaceNames.has(d.key)) local.add(d.key)
@@ -334,7 +375,12 @@ async function resolveDep(
     !allowed(hit.version)
 
   if (!hasPnp) {
-    const r = await resolveInstalled(m.dir, d.key, projectBoundary(root))
+    // node_modules is looked up to the folder of the lockfile, never past a separate install
+    const r = await resolveInstalled(
+      m.dir,
+      d.key,
+      lock?.dir ?? projectBoundary(root)
+    )
     // node_modules is behind the project when it differs from a lockfile written for this very
     // specifier, or, with a stale lockfile too, when the manifest does not even allow it. A linked
     // workspace package is the project's own code, whatever version it carries.
@@ -375,7 +421,9 @@ async function resolveDep(
     const flags: InstalledDep["flags"] = []
     if (hit.name !== d.key) flags.push("alias")
     return withSkipped({
-      id: `${lock.reader.source}:${hit.name}@${hit.version}`,
+      // the lockfile's folder is part of the id: two separate installs that happen to hold the
+      // same version are still two copies, one of which may have moved
+      id: `${lock.reader.source}:${relPath(root, lock.dir) || "."}:${hit.name}@${hit.version}`,
       name: hit.name,
       version: hit.version,
       versionSource: lock.reader.source,
