@@ -62,6 +62,39 @@ describe("rules records", () => {
     ])
   })
 
+  it("do not take a commit scope for the change when the title names another API", () => {
+    const scoped = splitEntries(
+      "8.0.0",
+      [
+        "- fix(model): make Model.bulkWrite() with empty array not throw #13664",
+        "- fix(model): add versionKey to bulkWrite when upserting #13981",
+        "- feat(connection): add `withSession` helper by @someone in #14339",
+        "- fix(connection): reset document state between transaction retries #13726",
+        "- diff: fix prerelease to stable version diff logic (#755)",
+      ].join("\n")
+    )
+    const records = rulesRecords(scoped, {
+      names: ["model", "connection", "diff"],
+      options: [],
+    })
+    expect(records.map((r) => [r.what, r.mentions])).toEqual([
+      [
+        "fix(model): make Model.bulkWrite() with empty array not throw #13664",
+        [],
+      ],
+      ["fix(model): add versionKey to bulkWrite when upserting #13981", []],
+      ["feat(connection): add withSession helper by @someone in #14339", []],
+      [
+        "fix(connection): reset document state between transaction retries #13726",
+        [{ name: "connection", regions: [], scope: true }],
+      ],
+      [
+        "diff: fix prerelease to stable version diff logic (#755)",
+        [{ name: "diff", regions: [], scope: true }],
+      ],
+    ])
+  })
+
   it("join to the same result after a round trip through JSON", () => {
     const records = rulesRecords(entries, {
       names: ["email", "object"],

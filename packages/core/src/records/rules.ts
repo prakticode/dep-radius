@@ -87,6 +87,43 @@ function scopeOf(e: NoteEntry): string | undefined {
   return m?.[1] ?? m?.[2]
 }
 
+// A scope is the area a commit touched. When the rest of the title names the API that changed, as
+// in `fix(model): make Model.bulkWrite() not throw` or `feat(connection): add withSession`, the scope
+// is not the change, and a project using `model` is not concerned by it.
+function titleNamesAnotherApi(e: NoteEntry, scope: string): boolean {
+  const title = e.title
+    .replace(/^[0-9a-f]{7,40}\s+/, "")
+    .replace(/^(?:#\d+\s+)+/, "")
+    .replace(/^[^:]*:\s/, "")
+    .replace(/\bby @\S+.*$/, "")
+    .replace(/@\S+/g, "")
+    .replace(/#\d+/g, "")
+    .replace(/\([0-9a-f]{5,}\)/g, "")
+  if (CALL_SHAPED.test(title)) return true
+  const end = e.regions.findIndex(
+    (r) => r.kind === "prose" || r.kind === "code-block"
+  )
+  const headline = end < 0 ? e.regions : e.regions.slice(0, end)
+  // a code span holding a commit hash or an issue number is a reference, not an API
+  if (
+    headline.some(
+      (r) =>
+        r.kind === "inline-code" &&
+        !/^\s*(?:[0-9a-f]{7,40}|#\d+)\s*$/.test(r.text)
+    )
+  )
+    return true
+  // an identifier written in plain words: camelCase, snake_case or long; not an acronym or a
+  // capitalised word
+  return (title.match(/[A-Za-z_$][\w$]*/g) ?? []).some(
+    (w) =>
+      w !== scope &&
+      isCodeShaped(w) &&
+      !/^[A-Z]+$/.test(w) &&
+      !/^[A-Z][a-z]+$/.test(w)
+  )
+}
+
 function camelCase(header: string): string {
   return header
     .toLowerCase()
@@ -136,7 +173,11 @@ export function rulesRecords(
   }
 
   return live.map((e): ChangeRecord => {
-    const scope = scopeOf(e)
+    const titleScope = scopeOf(e)
+    const scope =
+      titleScope && !titleNamesAnotherApi(e, titleScope)
+        ? titleScope
+        : undefined
     const mentions: Mention[] = []
     for (const n of names) {
       const regions: RegionKind[] = []
