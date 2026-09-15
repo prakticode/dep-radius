@@ -283,6 +283,14 @@ export async function link(
       }
       for (const r of f.references) {
         if (!r.derivedInto) continue
+        if (r.typed) {
+          for (const src of typedSources(rel, r))
+            push(r.derivedInto, {
+              ...src,
+              origin: extendOrigin(src.origin!, r.chain, r.callSelf),
+            })
+          continue
+        }
         const b = f.imports.find((i) => i.local === r.local)
         if (b)
           for (const t of pkgTargetsOfBinding(rel, b, r.chain, r.callSelf))
@@ -294,9 +302,11 @@ export async function link(
         for (const r of f.references) {
           if (!r.callbackInto) continue
           const b = f.imports.find((i) => i.local === r.local)
-          const sources = b
-            ? pkgTargetsOfBinding(rel, b, r.chain, r.callSelf)
-            : (out.get(r.local) ?? [])
+          const sources = r.typed
+            ? typedSources(rel, r)
+            : b
+              ? pkgTargetsOfBinding(rel, b, r.chain, r.callSelf)
+              : (out.get(r.local) ?? [])
           for (const src of sources)
             for (const cb of r.callbackInto)
               push(cb, { target: src.target, hops: src.hops })
@@ -405,6 +415,33 @@ export async function link(
       }
     }
     return out
+  }
+
+  // The values a typed reference reads, as built from the package: `ctx: Context` is an instance
+  // of Context. Only a type the package exports is followed, never a local one.
+  const typedSources = (
+    rel: string,
+    r: FileFacts["references"][number]
+  ): DerivedSource[] => {
+    const typed = r.typed
+    const b = typed && facts.get(rel)?.imports.find((i) => i.local === r.local)
+    if (!typed || !b) return []
+    return pkgTargetsOfBinding(rel, b, typed.chain, typed.callSelf).flatMap(
+      (src) =>
+        src.origin && src.hops === 0
+          ? [
+              {
+                ...src,
+                origin: {
+                  ...src.origin,
+                  ...(typed.instance
+                    ? { instanceAt: src.origin.chain.length }
+                    : {}),
+                },
+              },
+            ]
+          : []
+    )
   }
 
   // ---------------------------------------------------------------- attribution
@@ -516,6 +553,24 @@ export async function link(
 
     for (const r of f.references) {
       const s = site(rel, r.pos, r.typeOnly)
+      if (r.typed) {
+        // a read on a value of the package's type: walked from the type, like a derived value
+        for (const src of typedSources(rel, r)) {
+          if (r.chain.length === 0) continue
+          accFor(src.target).refs.push(
+            rawRef(
+              src.target,
+              src.target.pkg,
+              { kind: "derived" },
+              r.chain,
+              r.callSelf,
+              s,
+              src.origin
+            )
+          )
+        }
+        continue
+      }
       const b = bindingByLocal.get(r.local)
       if (b) {
         const t = target(rel, b.specifier)
