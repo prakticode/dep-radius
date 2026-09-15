@@ -65,10 +65,20 @@ jobs:
           npm install --no-audit --no-fund ../packs/*.tgz
           npx radius --version
           npx radius --help > /dev/null
+      # radius's cache from earlier runs: its entries expire on their own (release note pages after an
+      # hour, bodies after a day), and without it every run fetches the notes of every dependency
+      # through the workflow token, whose hourly quota a few merges in a row can use up and stall the
+      # release job. The run id keys a fresh save each time; restore-keys picks the latest one.
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/radius-cache
+          key: radius-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: radius-cache-${{ runner.os }}-
       # radius on its own repository: exit 1 (review) and 2 (blocked) are verdicts, 3 is a failure
       - name: run on this repository
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          RADIUS_CACHE_DIR: ${{ runner.temp }}/radius-cache
         run: |
           set +e
           "$RUNNER_TEMP/consumer/node_modules/.bin/radius" --markdown >> "$GITHUB_STEP_SUMMARY"
@@ -79,6 +89,7 @@ jobs:
       - name: run --since on this repository
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          RADIUS_CACHE_DIR: ${{ runner.temp }}/radius-cache
         run: |
           set +e
           "$RUNNER_TEMP/consumer/node_modules/.bin/radius" --since HEAD --json > "$RUNNER_TEMP/since.json"
