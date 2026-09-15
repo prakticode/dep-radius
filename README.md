@@ -12,6 +12,10 @@ npx dep-radius --since HEAD --json   # after an upgrade, for an agent
 npx dep-radius                       # every dependency with an update, for you
 ```
 
+On pull requests:
+[add it to a repo that uses Renovate or Dependabot](https://depradius.com/docs/github-action#set-it-up-with-renovate-or-dependabot).
+One workflow file, and each dependency update gets a comment with the lines to check.
+
 ## The problem
 
 Your agent upgrades `zod` from 4.4.3 to 4.5.0. The code compiles. The tests pass. The agent says
