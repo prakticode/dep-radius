@@ -4,14 +4,20 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
 
-import { matchNotes } from "../../src/notes/match.ts"
 import { splitEntries } from "../../src/notes/entries.ts"
 import { rulesRecords } from "../../src/records/rules.ts"
+import { tieRemovals } from "../../src/records/removals.ts"
 import { validateRecords } from "../../src/records/validate.ts"
 import { joinRecords, subjectSites } from "../../src/records/join.ts"
+import { matchNotes, type MatchResult } from "../../src/notes/match.ts"
 import { loadRecords, recordFileName } from "../../src/records/load.ts"
-import type { NoteEntry, Surface, SurfaceSymbol } from "../../src/model.ts"
 import { type ChangeRecord, RECORD_SCHEMA } from "../../src/records/record.ts"
+import type {
+  NoteEntry,
+  Surface,
+  SurfaceSymbol,
+  Touched,
+} from "../../src/model.ts"
 
 const entries = splitEntries(
   "3.0.0",
@@ -287,5 +293,99 @@ describe("records from outside the run", () => {
     )
     expect(loaded).toEqual(expected)
     expect(await loadRecords(dir, "other", ["4.0.0"])).toEqual([])
+  })
+})
+
+describe("removals a breaking note describes", () => {
+  const notes = splitEntries(
+    "5.0.0",
+    [
+      "### Breaking Changes",
+      "",
+      "- change: Remove Deprecated Legacy Namespace Support (#10)",
+      "- change: Remove deprecated helpers (#11)",
+      "- change: Drop support for Node.js 18 (#12)",
+    ].join("\n")
+  )
+  // `export = lib` of a namespace: its members are the entry's names, with nothing at `lib:` itself
+  const from: Surface = {
+    ...surface("4.0.0", {
+      "lib:auth": {},
+      "lib:apps": { kind: "variable" },
+      "lib:credential": { kind: "namespace" },
+      "lib:credential.cert": {},
+      "lib/extra:legacy": { deprecated: true },
+      "lib/extra:gone": {},
+    }),
+    entries: {
+      ".": { typesFile: "index.d.ts", exportEquals: true },
+      "./extra": { typesFile: "extra.d.ts", exportEquals: false },
+    },
+  }
+  const to: Surface = {
+    ...surface("5.0.0", { "lib:getAuth": {} }),
+    entries: {
+      ".": { typesFile: "index.d.ts", exportEquals: false },
+      "./extra": { typesFile: "extra.d.ts", exportEquals: false },
+    },
+  }
+  const removed = (path: string): Touched => ({
+    change: { path, kind: from.symbols[path]!.kind, before: [], alsoAt: [] },
+    bucket: "removed",
+    strength: "strong",
+    sites: [site],
+  })
+  const shown = (m: MatchResult) => ({
+    matched: m.matched.map((x) => [
+      x.entry.title,
+      x.direct,
+      x.hits.map((h) => `${h.name} ${h.strength} ${h.subject}`),
+    ]),
+    breaking: m.unattributedBreaking.map((e) => e.title),
+  })
+  const all = [
+    removed("lib:apps"),
+    removed("lib:auth"),
+    removed("lib:credential"),
+    removed("lib/extra:gone"),
+    removed("lib/extra:legacy"),
+  ]
+  const used = ["auth", "apps", "credential", "gone", "legacy"]
+
+  it("tie a note naming the namespace to the removed names that lived in it, and one about deprecated APIs to those the old types marked", () => {
+    const m = tieRemovals(matchNotes(notes, used, []), all, { from, to })
+    expect(shown(m)).toEqual({
+      matched: [
+        [
+          "change: Remove Deprecated Legacy Namespace Support (#10)",
+          false,
+          [
+            "apps weak lib:apps",
+            "auth weak lib:auth",
+            "credential weak lib:credential",
+          ],
+        ],
+        [
+          "change: Remove deprecated helpers (#11)",
+          false,
+          ["legacy weak lib/extra:legacy"],
+        ],
+      ],
+      // an ordinary export gone, and a note that says nothing about what went: still anyone's
+      breaking: ["change: Drop support for Node.js 18 (#12)"],
+    })
+  })
+
+  it("leave every note where it was when nothing the words describe was removed", () => {
+    const before = matchNotes(notes, used, [])
+    // the namespace is still exported, and nothing was marked deprecated
+    const still: Surface = { ...to, entries: from.entries }
+    const plain = [removed("lib:auth"), removed("lib/extra:gone")]
+    expect(tieRemovals(before, plain, { from, to: still })).toEqual(before)
+    // nothing the project uses was removed
+    expect(tieRemovals(before, [], { from, to })).toEqual(before)
+    // a removal only by member name is not one the project is known to use
+    const weak = { ...removed("lib:auth"), strength: "weak" as const }
+    expect(tieRemovals(before, [weak], { from, to })).toEqual(before)
   })
 })

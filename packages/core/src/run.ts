@@ -9,6 +9,7 @@ import { limitsFor } from "./render/limits.ts"
 import { loadRecords } from "./records/load.ts"
 import { subjectSites } from "./records/join.ts"
 import { collectNotes } from "./notes/collect.ts"
+import { tieRemovals } from "./records/removals.ts"
 import { buildPackageBrief } from "./analyze/brief.ts"
 import { getPackument } from "./registry/packument.ts"
 import { validateRecords } from "./records/validate.ts"
@@ -210,7 +211,7 @@ export async function run(
             surfaces
           )
         : []
-    const match = notes
+    const named = notes
       ? matchNotes(
           notes.entries,
           usage?.strongNames ?? [],
@@ -223,6 +224,9 @@ export async function run(
           }
         )
       : undefined
+    // a break naming no API that says what the types show removed from under the code
+    const match =
+      named && surfaces ? tieRemovals(named, surface.touched, surfaces) : named
     // what the notes radius cannot tie by name may still reach, through the package's own code
     const unplaced = match
       ? [...match.unattributedBreaking, ...match.unattributedChanges]
