@@ -45,8 +45,9 @@ something Express 5 changed.
 Set up the [GitHub Action](/docs/github-action). It runs this comparison on each pull request that
 changes a dependency, and comments with every changed version.
 
-Note: GitHub gives Dependabot pull requests a read-only token, so the comment can't be posted there.
-The same result is in the job summary of the workflow run.
+Dependabot pull requests get a read-only token unless the workflow asks for
+`pull-requests: write`. The [setup](/docs/github-action) does. Without it, the comment can't be
+posted, and the same result is in the job summary of the workflow run.
 
 ## On one pull request, by hand
 

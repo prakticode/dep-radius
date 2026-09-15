@@ -13,7 +13,9 @@ comment. Pull requests that change no dependency get no comment.
   has it.
 </Callout>
 
-## Set it up
+## Set it up with Renovate or Dependabot
+
+Add this file to the repository. It works the same for Renovate and Dependabot.
 
 ```yaml title=".github/workflows/dep-radius.yml"
 name: dep-radius
@@ -39,8 +41,46 @@ jobs:
       - uses: prakticode/dep-radius@v0
 ```
 
-That's all. No install step: radius reads the lockfile. The `paths` filter is optional. It skips
-pull requests that can't change a dependency.
+That's all. No install step: radius reads the lockfile. What each part does:
+
+- **`pull_request`** runs it on every pull request, from a bot or a person. The `paths` filter is
+  optional. It skips pull requests that can't change a dependency. Without it, a pull request that
+  changes no dependency still gets no comment.
+- **`pull-requests: write`** lets the job post the comment. Workflows started by Dependabot get a
+  read-only token by default, and this key is how GitHub lets you raise it. Renovate pull requests
+  get the usual token. No secret is needed.
+- **`actions/checkout`** with its default settings is enough. The Action fetches the one base commit
+  it needs, so there is no need for `fetch-depth: 0`.
+- **`@v0`** follows every 0.x release. See pinning below.
+
+### Only on pull requests from the bots
+
+To skip pull requests opened by people, add a condition on the author:
+
+```yaml
+jobs:
+  brief:
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]' ||
+      github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+```
+
+This checks who opened the pull request, not `github.actor`, which is whoever pushed last. A person
+who pushes a fix to a Renovate branch still gets the comment. A self-hosted Renovate uses the login
+of its own bot account: use that login instead.
+
+### Forks and `pull_request_target`
+
+Renovate and Dependabot push their branches to your repository, so their pull requests are not
+forks. A pull request from a fork gets a read-only token that the workflow can't raise. There, the
+Action shows a warning, doesn't fail, and the result is in the job summary.
+
+Don't switch to `pull_request_target` to comment on forks. It gives the job a write token. To read
+the pull request, the job would have to check out its files, and the Action runs `npx` inside them.
+A `.npmrc` in those files can point npm at another registry, so the pull request would choose the
+code that runs with your token. With `pull_request`, that risk is gone: a fork only gets a read-only
+token, and a branch in your repository was pushed by someone who already has write access.
 
 ## What you get
 
@@ -131,8 +171,9 @@ the repository settings.
 
 ## Good to know
 
-- **Dependabot and forks.** GitHub gives these pull requests a read-only token, so the comment can't
-  be posted. The Action shows a warning, doesn't fail, and the result is still in the job summary.
+- **Dependabot and forks.** Dependabot pull requests can be commented on once the job has
+  `pull-requests: write`. Pull requests from forks can't, see
+  [forks](#forks-and-pull_request_target). The result is in the job summary either way.
 - **Pinning.** `@v0` follows every 0.x release. To pin exactly, use a full tag like `@v0.2.0`, or
   set `version`.
 - **Node.js.** If the runner's Node is older than 22.18, the Action sets up Node 24 for its own

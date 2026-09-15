@@ -1,5 +1,5 @@
 name: dep-radius
-description: A comment on every pull request that changes a dependency, with the changes that affect your code and the lines to check.
+description: "Comments on Renovate and Dependabot pull requests: the release notes that affect your code, and the lines to check."
 author: prakticode
 branding:
   icon: target
