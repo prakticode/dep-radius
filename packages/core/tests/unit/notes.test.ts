@@ -87,6 +87,35 @@ describe("splitEntries", () => {
     )
     expect(e.map((x) => x.breakingMarker)).toEqual([true, true, true, false])
   })
+
+  it("keeps the items nested under a bullet in that bullet", () => {
+    const e = splitEntries(
+      "15.0.0",
+      [
+        "### Changed",
+        "- [breaking] `widget-it` => v6",
+        "  - No fuzzy links by default.",
+        "  - Unicode punctuation terminates the link by default.",
+        "  - See [widget-it changelog](https://x/CHANGELOG.md)",
+        "    for other changes.",
+        "- Moved `validateLink` from properties",
+        "  to prototype methods.",
+      ].join("\n")
+    )
+    expect(e.map((x) => x.title)).toEqual([
+      "[breaking] widget-it => v6",
+      "Moved validateLink from properties",
+    ])
+    expect(e[0]!.breakingMarker).toBe(true)
+    expect(
+      e[0]!.regions.filter((r) => r.kind === "prose").map((r) => r.text)
+    ).toEqual([
+      "- No fuzzy links by default.",
+      "- Unicode punctuation terminates the link by default.",
+      "- See widget-it changelog",
+      "for other changes.",
+    ])
+  })
 })
 
 describe("matchNotes", () => {
@@ -386,6 +415,29 @@ describe("matchNotes with commit titles", () => {
       ],
       ["fix(inc): validate identifiers", ["inc"]],
     ])
+  })
+})
+
+describe("matchNotes with the packages behind an API", () => {
+  const entries = splitEntries(
+    "15.0.0",
+    [
+      "- [breaking] `widget-it` => v6",
+      "  - No fuzzy links by default.",
+      "- Bumped `path-to-regexp` to 8.0.0",
+      "- Replaced widget-it with a faster parser",
+      "- `widget-it --fuzzy` is the default",
+    ].join("\n")
+  )
+  const titles = (weak: string[]) =>
+    matchNotes(entries, [], weak).matched.map((m) => m.entry.title)
+
+  it("ties a package named as code to the member named after it", () => {
+    expect(titles(["widget"])).toEqual(["[breaking] widget-it => v6"])
+  })
+
+  it("never ties a longer package name, one in plain words or in a command", () => {
+    expect(titles(["path", "to"])).toEqual([])
   })
 })
 

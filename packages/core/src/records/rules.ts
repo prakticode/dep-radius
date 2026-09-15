@@ -28,6 +28,14 @@ function patternFor(name: string): RegExp {
   )
 }
 
+// A package written as a whole code span, `parser-it` or `parser-it@6`, is the one behind the member
+// named after it (`md.parser`): a note about its new major is about that member. A longer name,
+// `path-to-regexp`, says nothing about `path`.
+function packageFor(name: string): RegExp | undefined {
+  if (name.length < 3) return undefined
+  return new RegExp(`^\\s*${escape(name)}-[a-z][a-z0-9]*(?:@[\\w.^~-]+)?\\s*$`)
+}
+
 const CALL_SHAPED = /[\w$]\(\)|\.[a-z]\w*\(/i
 
 // A change that names an API somewhere is about that API; when it is not one of yours, it is
@@ -157,6 +165,7 @@ export function rulesRecords(
   const names = [...new Set(vocabulary.names)].map((name) => ({
     name,
     re: patternFor(name),
+    pkg: packageFor(name),
   }))
 
   // a name found in the examples of many entries is example boilerplate, not news: `v.object()` in
@@ -182,7 +191,12 @@ export function rulesRecords(
     for (const n of names) {
       const regions: RegionKind[] = []
       for (const r of e.regions)
-        if (!regions.includes(r.kind) && n.re.test(r.text)) regions.push(r.kind)
+        if (
+          !regions.includes(r.kind) &&
+          (n.re.test(r.text) ||
+            (r.kind === "inline-code" && n.pkg?.test(r.text)))
+        )
+          regions.push(r.kind)
       const scoped = n.name.length >= 3 && n.name === scope
       if (regions.length === 0 && !scoped) continue
       mentions.push({
