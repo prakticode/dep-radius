@@ -142,6 +142,8 @@ export interface RawRef {
   site: Site
   // set on derived references when the value's construction is known, so Level 1 can keep walking
   origin?: RefOrigin
+  // the keys of object literals this reference passes to its calls, each where it is written
+  passed?: Record<string, Site>
 }
 
 export type OpaqueKind =

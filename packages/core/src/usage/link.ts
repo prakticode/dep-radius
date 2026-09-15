@@ -643,19 +643,32 @@ export async function link(
   for (const s of input.globalSkipped)
     note(globalCounts, "skipped-generated", s)
 
-  const passedAt = new Map<string, string[]>()
+  // each key where it is written: a call spread over lines also lands on the line of the option
+  const passedAt = new Map<string, Record<string, Site>>()
   for (const [rel, f] of facts)
     for (const p of f.passedKeys ?? [])
-      passedAt.set(`${rel}:${p.line}:${p.col}`, p.keys)
+      passedAt.set(
+        `${rel}:${p.line}:${p.col}`,
+        Object.fromEntries(p.keys.map((key, i) => [key, site(rel, p.at[i]!)]))
+      )
 
   const packages: Record<string, PackageUsage> = {}
   for (const [id, a] of acc) {
     const passed = new Map<string, Site[]>()
-    for (const r of a.refs)
-      for (const key of passedAt.get(
-        `${r.site.file}:${r.site.line}:${r.site.col}`
-      ) ?? [])
+    for (const r of a.refs) {
+      const keys = passedAt.get(`${r.site.file}:${r.site.line}:${r.site.col}`)
+      if (!keys) continue
+      r.passed = Object.fromEntries(
+        Object.entries(keys).map(([key, at]) => [
+          key,
+          r.site.via ? { ...at, via: r.site.via } : at,
+        ])
+      )
+      for (const [key, at] of Object.entries(r.passed)) {
         note(passed, key, r.site)
+        note(passed, key, at)
+      }
+    }
     const strong = new Set<string>()
     const weak = new Set<string>()
     for (const r of a.refs) {

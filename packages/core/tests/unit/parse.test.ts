@@ -105,8 +105,21 @@ describe("parse: keys passed to calls", () => {
       const pool = new Pool({ ssl, [computed]: 1, ...rest })
       bodyParser.text()
     `)
-    expect(f.passedKeys).toEqual([
-      { line: 3, col: 15, keys: ["limit", "type"] },
+    expect(
+      f.passedKeys.map(({ at, ...p }) => ({
+        ...p,
+        at: at.map((x) => [x.line, x.col]),
+      }))
+    ).toEqual([
+      {
+        line: 3,
+        col: 15,
+        keys: ["limit", "type"],
+        at: [
+          [3, 33],
+          [3, 45],
+        ],
+      },
     ])
   })
 })

@@ -81,6 +81,20 @@ describe("usage link", () => {
     ])
   })
 
+  it("lands a passed option on its call and on the line that writes it", async () => {
+    const { usage } = await usageOf(
+      {
+        "package.json": pkgJson({ dependencies: { pooler: "^1.0.0" } }),
+        ...dep("pooler"),
+        "db.js": `const { Pool } = require("pooler")\nconst pool = new Pool({\n  max: 10,\n  ssl: true,\n})\n`,
+      },
+      "pooler"
+    )
+    expect(usage?.passedOptions?.ssl?.map((s) => s.line)).toEqual([2, 4])
+    const ref = usage?.refs.find((r) => r.passed)
+    expect(ref?.passed?.max?.line).toBe(3)
+  })
+
   it("counts what it cannot see instead of skipping it", async () => {
     const { usage, global } = await usageOf(
       {

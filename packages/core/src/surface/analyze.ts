@@ -120,7 +120,13 @@ export async function analyzeSurface(
     const res = resolveRef(a.surface, r)
     for (const path of res.paths) {
       add(byPath, path, r.site)
-      for (const name of optionsAt(a.surface, path)) add(byOption, name, r.site)
+      for (const name of optionsAt(a.surface, path)) {
+        // the call, and the line the option is written on when the call spreads over lines
+        add(byOption, name, r.site)
+        // an option can be named `constructor`: only the keys the call wrote
+        if (r.passed && Object.hasOwn(r.passed, name))
+          add(byOption, name, r.passed[name]!)
+      }
     }
     for (const name of res.unresolvedTail) add(byMember, name, r.site)
     if (res.missingHead) {
