@@ -85,7 +85,7 @@ export interface FileFacts {
   unparseable: boolean
 }
 
-export const SCANNER_VERSION = 4
+export const SCANNER_VERSION = 5
 
 export function parseSource(src: SourceText): FileFacts {
   const facts: FileFacts = {
@@ -580,6 +580,11 @@ function climbFrom(start: ts.Node): Climb {
       const last = chain[chain.length - 1]
       const construct = ts.isNewExpression(p)
       if (last) {
+        // `f(a)(b)`: the second call's arguments are not the first's
+        const args = p.arguments ?? []
+        if (last.call || args.some((a) => ts.isSpreadElement(a)))
+          delete last.args
+        else last.args = args.length
         last.call = true
         if (construct) last.construct = true
       } else callSelf = true

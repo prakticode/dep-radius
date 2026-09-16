@@ -1,4 +1,5 @@
 import { entryPrefix, parsePath } from "../symbol-path.ts"
+import { matching, splitSeparators } from "./signature.ts"
 import type {
   CanonPath,
   Surface,
@@ -8,6 +9,9 @@ import type {
   UnprovenCause,
   UnprovenRemoval,
 } from "../model.ts"
+
+// Bump when the diff changes: the delta cache key carries it.
+export const DELTA_VERSION = 1
 
 // A pure function of two surfaces: identical for everyone who compares these two versions.
 export function diffSurfaces(a: Surface, b: Surface): SurfaceDelta {
@@ -67,12 +71,15 @@ export function diffSurfaces(a: Surface, b: Surface): SurfaceDelta {
       const gainsSignatures =
         sa.length === 0 &&
         (before.kind === "namespace" || before.kind === "interface")
-      raw[gainsSignatures || isWidening(sa, sb) ? "widened" : "changed"].push({
+      const widened = gainsSignatures || isWidening(sa, sb)
+      const fromParam = widened ? undefined : firstChangedParam(sa, sb)
+      raw[widened ? "widened" : "changed"].push({
         path,
         kind: after.kind,
         before: sa,
         after: sb,
         alsoAt: [],
+        ...(fromParam !== undefined ? { fromParam } : {}),
       })
     } else if (!before.deprecated && after.deprecated && !before.aliasOf) {
       raw.deprecated.push({
@@ -204,6 +211,63 @@ function appendsOptional(old: string, neu: string): boolean {
     extra.length > 0 &&
     extra.split(/,\s*/).every((p) => p.endsWith("?") || p.startsWith("..."))
   )
+}
+
+// Overloads compared in order: each keeps its type parameters, its return type and its arity, and
+// every parameter from the first that differs on is optional on both sides. A call with no more
+// arguments than that index resolves the same overload to the same type, whatever the library.
+function firstChangedParam(
+  before: string[],
+  after: string[]
+): number | undefined {
+  if (before.length === 0 || before.length !== after.length) return undefined
+  let first: number | undefined
+  for (const [i, text] of before.entries()) {
+    const a = parseSignature(text)
+    const b = parseSignature(after[i]!)
+    if (
+      !a ||
+      !b ||
+      a.typeParams !== b.typeParams ||
+      a.returns !== b.returns ||
+      a.params.length !== b.params.length
+    )
+      return undefined
+    const k = a.params.findIndex((p, j) => p !== b.params[j])
+    if (k < 0) continue
+    const optional = (p: string) => p.endsWith("?") || p.startsWith("...")
+    if (
+      !a.params.slice(k).every(optional) ||
+      !b.params.slice(k).every(optional)
+    )
+      return undefined
+    first = Math.min(first ?? k, k)
+  }
+  return first
+}
+
+// "<$T0>(a, b?) => R" as its parts, or undefined for anything else (a hashed or non-call signature)
+function parseSignature(
+  s: string
+): { typeParams: string; params: string[]; returns: string } | undefined {
+  let open = 0
+  if (s.startsWith("<")) {
+    const end = matching(s, 0)
+    if (end < 0) return undefined
+    open = end + 1
+  }
+  if (s[open] !== "(") return undefined
+  const close = matching(s, open)
+  if (close < 0 || !s.startsWith(" => ", close + 1)) return undefined
+  const inner = s.slice(open + 1, close)
+  return {
+    typeParams: s.slice(0, open),
+    params:
+      inner.trim() === ""
+        ? []
+        : splitSeparators(inner).map((p) => p.replace(/,\s*$/, "").trim()),
+    returns: s.slice(close + 5),
+  }
 }
 
 function parentOf(path: CanonPath): CanonPath | undefined {

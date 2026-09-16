@@ -79,6 +79,9 @@ export function effectiveChain(ref: RawRef): {
 
 export interface Resolution {
   paths: CanonPath[]
+  // for each path, the arguments the site passes when it calls it; undefined when it does not, or
+  // when the count is unknown
+  args: (number | undefined)[]
   // names left once the walk lost the type: matched against members by name only
   unresolvedTail: string[]
   // the first name the chain reaches for is not in the surface at all
@@ -100,7 +103,12 @@ export function resolveRef(surface: Surface, ref: RawRef): Resolution {
 function walk(surface: Surface, ref: RawRef, instanceAt?: number): Resolution {
   // the surface's own name: @types/lib answers for code that imports "lib"
   const prefix = entryPrefix(surface.pkg, ref.entry)
-  const out: Resolution = { paths: [], unresolvedTail: [], missingHead: false }
+  const out: Resolution = {
+    paths: [],
+    args: [],
+    unresolvedTail: [],
+    missingHead: false,
+  }
   if (ref.binding.kind === "derived") {
     if (!ref.origin) {
       out.unresolvedTail = ref.chain.map((s) => s.name)
@@ -144,6 +152,7 @@ function walk(surface: Surface, ref: RawRef, instanceAt?: number): Resolution {
       : 0
     return {
       paths: full.paths.slice(prefixLen),
+      args: full.args.slice(prefixLen),
       unresolvedTail: full.unresolvedTail,
       missingHead: false,
     }
@@ -208,6 +217,7 @@ function walk(surface: Surface, ref: RawRef, instanceAt?: number): Resolution {
       return out
     }
     out.paths.push(modulePath)
+    out.args.push(undefined)
     cursor = next
   } else if (startCall) {
     const self = surface.symbols[modulePath]
@@ -216,6 +226,7 @@ function walk(surface: Surface, ref: RawRef, instanceAt?: number): Resolution {
       return out
     }
     out.paths.push(modulePath)
+    out.args.push(undefined)
     cursor = self.returns
       ? { kind: "type", path: self.returns }
       : self.instanceOf
@@ -240,8 +251,13 @@ function walk(surface: Surface, ref: RawRef, instanceAt?: number): Resolution {
       out.unresolvedTail.push(...segs.slice(i).map((s) => s.name))
       break
     }
+    const args = seg.call ? seg.args : undefined
     out.paths.push(path)
-    if (raw.aliasOf && found.path !== path) out.paths.push(found.path)
+    out.args.push(args)
+    if (raw.aliasOf && found.path !== path) {
+      out.paths.push(found.path)
+      out.args.push(args)
+    }
     if (i === typeEnd) {
       cursor = instanceCursor(found)
       continue

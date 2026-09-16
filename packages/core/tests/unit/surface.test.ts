@@ -85,6 +85,44 @@ describe("surface delta", () => {
     ).toEqual(["p:f"])
   })
 
+  it("records the first changed parameter when the rest of a signature holds", () => {
+    const d = (a: string, b: string) =>
+      diffSurfaces(surface(a), surface(b)).changed.map((c) => c.fromParam)
+    // an optional options parameter gains a property, in every overload
+    expect(
+      d(
+        "export declare function f(a?: { x?: string }): void\nexport declare function f<T>(n: number, a?: { x?: T }): T",
+        "export declare function f(a?: { x?: string; y?: number }): void\nexport declare function f<T>(n: number, a?: { x?: T; y?: number }): T"
+      )
+    ).toEqual([0])
+    // a required parameter changes, the return type changes, or a parameter becomes required: none
+    expect(
+      d(
+        "export declare function f(a: string): void",
+        "export declare function f(a: number): void"
+      )
+    ).toEqual([undefined])
+    expect(
+      d(
+        "export declare function f(a?: string): void",
+        "export declare function f(a?: number): string"
+      )
+    ).toEqual([undefined])
+    expect(
+      d(
+        "export declare function f(a: string, b?: string): void",
+        "export declare function f(a: string, b: number): void"
+      )
+    ).toEqual([undefined])
+    // a callback parameter's arrow is not the signature's
+    expect(
+      d(
+        "export declare function f(a: string, cb?: (x: string) => void): void",
+        "export declare function f(a: string, cb?: (x: number) => void): void"
+      )
+    ).toEqual([1])
+  })
+
   it("finds a changed signature and a new deprecation", () => {
     expect(
       counts(
@@ -247,6 +285,21 @@ export declare function email(): EmailSchema
     expect(r.paths).toContain("schemakit:email")
     expect(r.paths.some((p) => p.endsWith("EmailSchema#max"))).toBe(true)
     expect(r.unresolvedTail).toEqual([])
+  })
+
+  it("keeps the argument count of each call beside its path", () => {
+    const r = resolveRef(
+      s,
+      ref({
+        chain: [
+          { name: "email", call: true, args: 0 },
+          { name: "max", call: true },
+        ],
+      })
+    )
+    expect(r.args).toHaveLength(r.paths.length)
+    expect(r.args[r.paths.indexOf("schemakit:email")]).toBe(0)
+    expect(r.args[r.paths.findIndex((p) => p.endsWith("#max"))]).toBe(undefined)
   })
 
   it("reads `import { v }` and a default import as the namespace", () => {

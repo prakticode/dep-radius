@@ -116,6 +116,8 @@ export interface ChainSeg {
   name: string
   call: boolean
   construct?: boolean
+  // how many arguments the call passes; absent when unknown (a spread, a second call, a tag)
+  args?: number
 }
 
 export interface Site {
@@ -268,6 +270,9 @@ export interface SurfaceChange {
   before?: string[]
   after?: string[]
   alsoAt: CanonPath[]
+  // a changed signature that keeps its type parameters, return type and arity, and differs only in
+  // optional parameters from the one at this index: a call passing no more arguments sees no change
+  fromParam?: number
 }
 
 // Missing from the new surface, but the new surface could not have shown it: not proof of a removal
