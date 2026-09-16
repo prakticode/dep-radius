@@ -229,6 +229,18 @@ describe("parse: references", () => {
     ])
   })
 
+  it("counts the arguments of each call, unless a spread or a second call hides them", () => {
+    const counts = (text: string) =>
+      facts(text).references.map((r) =>
+        r.chain.map((c) => `${c.name}:${c.args ?? "?"}`).join(".")
+      )
+    expect(
+      counts(
+        `import * as v from "schemakit"; v.email(); v.email({ a: 1 }).max(3, "m"); v.email(...xs); v.email()(); v.email`
+      )
+    ).toEqual(["email:0", "email:1.max:2", "email:?", "email:?", "email:?"])
+  })
+
   it("reads type positions as type-only", () => {
     expect(
       refs(

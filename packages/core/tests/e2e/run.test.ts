@@ -30,6 +30,10 @@ export declare function email(): Schema
 ${extra}
 `
 
+const optionsTypes = (extra: string) => `
+export declare function create(options?: { name?: string; ${extra} }, tag?: string): object
+`
+
 // `toString` as an option: a key the code never passes must not read an object's own members
 const typedTypes = (count: string) => `
 export interface Store { list(query?: { type?: string; ${count}?: number; toString?: string }): string[] }
@@ -142,6 +146,21 @@ const packages: FakePackage[] = [
     releases: { "v3.1.0": "- Internal cleanup\n" },
   },
   {
+    // an optional options parameter gains a property: only the call that passes options can see it
+    name: "acme-options",
+    repository: "git+https://github.com/acme/options.git",
+    versions: [
+      version("acme-options", "1.0.0", OLD, optionsTypes("")),
+      version(
+        "acme-options",
+        "1.1.0",
+        NEWISH,
+        optionsTypes("retries?: number")
+      ),
+    ],
+    releases: { "v1.1.0": "- ci: faster release job\n" },
+  },
+  {
     // an option of a member reached through a value the project declares with the package's type
     name: "acme-typed",
     repository: "git+https://github.com/acme/typed.git",
@@ -248,6 +267,7 @@ describe("run, end to end against a fake registry", () => {
       installed("acme-quiet", "1.0.0", schemaTypes()),
       installed("acme-notes", "2.0.0", schemaTypes()),
       installed("acme-member", "3.0.0", schemaTypes()),
+      installed("acme-options", "1.0.0", optionsTypes("")),
       installed("acme-typed", "1.0.0", typedTypes("limit")),
       installed("acme-program", "1.0.0", programTypes),
       installed("acme-dark", "1.0.0"),
@@ -269,6 +289,7 @@ describe("run, end to end against a fake registry", () => {
             "acme-quiet": "^1.0.0",
             "acme-notes": "^2.0.0",
             "acme-member": "^3.0.0",
+            "acme-options": "^1.0.0",
             "acme-typed": "^1.0.0",
             "acme-program": "^1.0.0",
             "acme-dark": "^1.0.0",
@@ -281,6 +302,7 @@ describe("run, end to end against a fake registry", () => {
         "packages/app/src/quiet.ts": `import * as q from "acme-quiet"\n\n// q.iban() is not called, a comment is not usage\nq.object({}).strict()\n`,
         "packages/app/src/schema.ts": `import { object } from "acme-member"\n\nexport const user = object({})\n`,
         "packages/app/src/member.ts": `import { user } from "./schema"\n\nexport function check(x: unknown) {\n  return user.parse(x)\n}\n`,
+        "packages/app/src/options.ts": `import * as o from "acme-options"\n\no.create()\no.create({ name: "a" })\no.create(...[])\n`,
         "packages/app/src/typed.ts": `import type { Context } from "acme-typed"\n\nexport function load(ctx: Context) {\n  return ctx.store.list({\n    type: "x",\n    limit: 5,\n  })\n}\n`,
         "packages/app/src/cli.ts": `import { Command } from "acme-program"\n\nexport class Cli {\n  constructor(private readonly program: Command) {}\n\n  init() {\n    this.program.command("generate").action((_, cmd) => this.pass(cmd))\n  }\n\n  pass = (cmd: Command) => cmd.args\n}\n`,
         "packages/app/src/dark.js": `const dark = require("acme-dark")\n\ndark.shade()\n`,
@@ -340,6 +362,20 @@ describe("run, end to end against a fake registry", () => {
     expect(changed?.strength).toBe("strong")
     expect(changed?.sites.map((s) => `${s.file}:${s.line}`)).toEqual([
       "packages/app/src/member.ts:4",
+    ])
+  })
+
+  it("leaves out the calls that stop before the first changed parameter", () => {
+    const p = byName("acme-options")
+    expect(p.verdict).toBe("review")
+    const changed = p.surface.touched.find(
+      (t) => t.change.path === "acme-options:create"
+    )
+    expect(changed?.change.fromParam).toBe(0)
+    // the call passing options, and the spread whose count is unknown
+    expect(changed?.sites.map((s) => `${s.file}:${s.line}`)).toEqual([
+      "packages/app/src/options.ts:4",
+      "packages/app/src/options.ts:5",
     ])
   })
 

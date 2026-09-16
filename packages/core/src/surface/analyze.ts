@@ -6,7 +6,7 @@ import { uniqueSites } from "../analyze/brief.ts"
 import { getTarballFiles } from "../registry/tarball.ts"
 import type { Packument } from "../registry/packument.ts"
 import type { RegistryConfig } from "../registry/npmrc.ts"
-import { diffSurfaces, surfaceChangeCount } from "./delta.ts"
+import { DELTA_VERSION, diffSurfaces, surfaceChangeCount } from "./delta.ts"
 import { entryPrefix, lastName, parsePath, resolveRef } from "../symbol-path.ts"
 import type {
   BlindSpotKind,
@@ -98,7 +98,7 @@ export async function analyzeSurface(
     }
   }
 
-  const deltaKey = `deltas/${keyOf(a.surface.integrity)}__${keyOf(b.surface.integrity)}.a${ALGO}.json`
+  const deltaKey = `deltas/${keyOf(a.surface.integrity)}__${keyOf(b.surface.integrity)}.a${ALGO}.d${DELTA_VERSION}.json`
   let delta = (await ctx.cache.getJson<SurfaceDelta>(deltaKey))?.value
   if (!delta) {
     delta = diffSurfaces(a.surface, b.surface)
@@ -115,11 +115,22 @@ export async function analyzeSurface(
     l.push(s)
     m.set(k, l)
   }
+  // the arguments each site passes when it calls the path, when known
+  const argsAt = new Map<string, Map<Site, number | undefined>>()
   const byOption = new Map<string, Site[]>()
   for (const r of refs) {
     const res = resolveRef(a.surface, r)
-    for (const path of res.paths) {
+    for (const [i, path] of res.paths.entries()) {
       add(byPath, path, r.site)
+      const calls = argsAt.get(path) ?? new Map<Site, number | undefined>()
+      // one site reaching a path twice keeps only what holds for both
+      calls.set(
+        r.site,
+        calls.has(r.site) && calls.get(r.site) !== res.args[i]
+          ? undefined
+          : res.args[i]
+      )
+      argsAt.set(path, calls)
       for (const name of optionsAt(a.surface, path)) {
         // the call, and the line the option is written on when the call spreads over lines
         add(byOption, name, r.site)
@@ -158,8 +169,15 @@ export async function analyzeSurface(
   ): Pick<Touched, "strength" | "sites"> | undefined => {
     const all = [change.path, ...change.alsoAt]
     const strongSites: Site[] = []
+    const from = change.fromParam
     for (const path of all) {
-      strongSites.push(...(byPath.get(path) ?? []))
+      strongSites.push(
+        ...(byPath.get(path) ?? []).filter((site) => {
+          // a call that stops before the first changed parameter sees the old signature
+          const args = argsAt.get(path)?.get(site)
+          return from === undefined || args === undefined || args > from
+        })
+      )
       if (takesChildren) {
         // a removed namespace or type takes every path under it
         for (const [used, sites] of byPath)

@@ -156,7 +156,7 @@ function sortOperands(s: string): string {
 }
 
 // "a, B<c, d>; e" -> ["a, ", "B<c, d>; ", "e"]: separators at depth zero only, kept on their segment
-function splitSeparators(s: string): string[] {
+export function splitSeparators(s: string): string[] {
   const out: string[] = []
   let depth = 0
   let inStr: string | undefined
@@ -213,7 +213,7 @@ function splitTop(s: string, ops: string[]): { items: string[]; op?: string } {
   return items.length > 1 ? { items, op: op! } : { items: [s] }
 }
 
-function matching(s: string, open: number): number {
+export function matching(s: string, open: number): number {
   const pairs: Record<string, string> = {
     "(": ")",
     "<": ">",
